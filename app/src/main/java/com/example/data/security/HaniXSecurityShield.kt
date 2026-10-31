@@ -41,7 +41,8 @@ object HaniXSecurityShield {
         "sha256/jQJTbIh0grw0/1TkHSumWb+Fs0Ggogr621gT3PvPKG0=", // Let's Encrypt R3
         "sha256/i7WTqTvh0OioIruIfFR4kMPnBqrS2rdiVPl/s2uC/CY=", // DigiCert Global Root G2
         "sha256/hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Gc=", // GTS Root R1 (Cloudflare / Google Trust)
-        "sha256/mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c="  // GTS Root R4
+        "sha256/mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=", // GTS Root R4
+        "sha256/KG6gDAqtU6Uhv/lJ7hWFkuFCw0iX0oaEPwzq8/z9iFM="  // Current Live HaniX Urdu Certificate
     )
 
     val certificatePinner: CertificatePinner = CertificatePinner.Builder()

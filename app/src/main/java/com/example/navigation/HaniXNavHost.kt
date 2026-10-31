@@ -455,9 +455,6 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
                         onAuthorizePlayback = { type, id ->
                             viewModel.authorizeAndStartBunnyPlayback(type, id)
                         },
-                        onSwitchServer = { server ->
-                            viewModel.switchPlaybackServer(server)
-                        },
                         onSelectRecommendedMovie = { movieId ->
                             navController.navigate(HaniXRoutes.videoPlayer("movie", movieId))
                         },

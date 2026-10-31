@@ -1137,7 +1137,7 @@ fun EpisodeListScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Play immediately in the MovieBox Player with Main Server, Server 2, and Direct Web Player:",
+                            text = "Play immediately in the high-performance MovieBox Player with automated server selection:",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondarySilver
                         )
@@ -1191,7 +1191,6 @@ fun VideoPlayerScreen(
     episodesList: List<Episode> = emptyList(),
     downloadActionState: RemoteDataState<EncryptedDownloadEntity> = RemoteDataState.Idle,
     onAuthorizePlayback: (String, String) -> Unit,
-    onSwitchServer: (PlaybackServerDto) -> Unit = {},
     onSelectRecommendedMovie: (String) -> Unit = {},
     onSelectRecommendedSeries: (String) -> Unit = {},
     onSelectEpisodeFromDrawer: (String) -> Unit = {},
@@ -1333,7 +1332,6 @@ fun VideoPlayerScreen(
     }
 
     val payload = (playbackAuthState as? RemoteDataState.Success)?.data
-    val availableServers = payload?.availableServers.orEmpty()
     val recommendedMovies = payload?.recommended.orEmpty()
     val userEmailForWeb = currentUser?.email?.trim().orEmpty()
     val isUserVip = currentUser?.isActiveVip == true
@@ -1560,13 +1558,13 @@ fun VideoPlayerScreen(
                                                                 var btns = document.querySelectorAll(sel);
                                                                 btns.forEach(function(b) {
                                                                     try {
-                                                                        if (b.offsetWidth > 0 || b.offsetHeight > 0) {
+                                                                        if (b.offsetWidth > 0 || b.offsetHeight > 0 || attempts < 10) {
                                                                             b.click();
-                                                                            b.dispatchEvent(new MouseEvent('mousedown', {bubbles:true}));
-                                                                            b.dispatchEvent(new MouseEvent('mouseup', {bubbles:true}));
-                                                                            b.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true}));
-                                                                            b.dispatchEvent(new TouchEvent('touchstart', {bubbles:true}));
-                                                                            b.dispatchEvent(new TouchEvent('touchend', {bubbles:true}));
+                                                                            b.focus();
+                                                                            ['mousedown', 'mouseup', 'click', 'touchstart', 'touchend'].forEach(function(ev) {
+                                                                                b.dispatchEvent(new MouseEvent(ev, {bubbles:true, cancelable:true, view:window}));
+                                                                                if (ev.startsWith('touch')) b.dispatchEvent(new TouchEvent(ev, {bubbles:true, cancelable:true}));
+                                                                            });
                                                                         }
                                                                     } catch(e) {}
                                                                 });
@@ -1604,7 +1602,7 @@ fun VideoPlayerScreen(
                                                     var itv = setInterval(function() {
                                                         triggerAutoPlayback();
                                                         if (attempts++ > maxAttempts) clearInterval(itv);
-                                                    }, 600);
+                                                    }, 300);
                                                 })();
                                             """.trimIndent()
                                             view?.evaluateJavascript(isolatePlayerJs, null)
@@ -1740,7 +1738,7 @@ fun VideoPlayerScreen(
                                                     var itv = setInterval(function(){
                                                         triggerPlayback();
                                                         if(attempts++ > maxAttempts) clearInterval(itv);
-                                                    }, 600);
+                                                    }, 300);
                                                 })();
                                             """.trimIndent()
                                             view?.evaluateJavascript(autoPlayJs, null)

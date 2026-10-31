@@ -16,6 +16,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Global Crash Handler for diagnostics
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            android.util.Log.e("HaniXCrash", "Uncaught exception in thread ${thread.name}", throwable)
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
+
         // Allow video screen recording while blocking all internal audio capture/copying (ALLOW_CAPTURE_BY_NONE)
         HaniXSecurityShield.enforceScreenRecordAllowedButAudioBlocked(this)
         HaniXSecurityShield.getOrCreatePrivateOfflineVaultDir(this)
