@@ -139,7 +139,7 @@ fun VipMembershipScreen(
     ) {
         HaniXTopBar(
             title = "Membership — FREE & VIP",
-            subtitle = "GET /vip/status • GET /vip/plans (check_premium.php)",
+            subtitle = "Upgrade to VIP for unlimited drama streaming",
             onBackClick = onBackClick
         )
 
@@ -192,7 +192,7 @@ fun VipMembershipScreen(
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "Strict Policy: Only FREE and VIP plans exist. Every new account starts as FREE. VIP access is granted solely after JazzCash payment verification via `add_premium.php` / `unlock_vip.php` or `shahkot.php` and automatically expires on `premium_users.expiry_date`.",
+                            text = "Only FREE and VIP plans exist. Every new account starts as FREE. Upgrade to VIP via JazzCash to unlock all VIP episodes, HD servers, and ad-free viewing.",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextMutedSlate
                         )
@@ -223,7 +223,7 @@ fun VipMembershipScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "Official payment details from hanixurdu.com (index.php & series.php)",
+                                    text = "Official payment details for instant VIP activation",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = TextSecondarySilver
                                 )
@@ -414,9 +414,9 @@ fun VipMembershipScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "• All FREE features included\n" +
-                                "• Watch all VIP movies and VIP series episodes (`is_premium = 1`)\n" +
-                                "• Official VIP Durations: 1 Month (Rs. 149 / Rs. 250) • 6 Months (Rs. 599) • 1 Year (Rs. 999)\n" +
-                                "• Verified against `premium_users.expiry_date`; automatically reverts to FREE upon expiry",
+                                "• Watch all VIP dramas and series episodes\n" +
+                                "• Official VIP Durations: 1 Month (Rs. 250) • 6 Months (Rs. 599) • 1 Year (Rs. 999)\n" +
+                                "• Instant VIP activation across all your devices",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondarySilver
                         )
@@ -534,8 +534,8 @@ fun UserProfileScreen(
             .testTag("user_profile_screen")
     ) {
         HaniXTopBar(
-            title = "Profile, Studio & Mind Games",
-            subtitle = "GET / PUT /user/profile • mind_game.php • studio.php",
+            title = "My Profile",
+            subtitle = "Account, Membership & Dubbing Studio",
             unreadNotifications = unreadNotifications,
             onVipClick = onNavigateToVip,
             onNotificationsClick = onNavigateToNotifications
@@ -607,7 +607,7 @@ fun UserProfileScreen(
                             OutlinedTextField(
                                 value = displayName,
                                 onValueChange = { displayName = it },
-                                label = { Text("Display Name (PUT /user/profile)") },
+                                label = { Text("Display Name") },
                                 singleLine = true,
                                 colors = hanixTextFieldColors(),
                                 modifier = Modifier
@@ -681,7 +681,7 @@ fun UserProfileScreen(
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "10 Random Questions • Bridges mind_game.php",
+                                        text = "10 Drama Trivia Questions",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = VipGoldLight
                                     )
@@ -833,7 +833,7 @@ fun UserProfileScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "POST /studio/audition • Bridges studio.php & upload.php",
+                                    text = "Voice Over & Dubbing Submissions",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = VipGoldLight
                                 )
@@ -841,7 +841,7 @@ fun UserProfileScreen(
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Upload your Urdu voice-over or dubbing sample (MP3, WAV, OGG, M4A, MP4 up to 10 MB; max 20 auditions/day in `auditions` table).",
+                            text = "Upload your Urdu voice-over or dubbing sample (MP3, WAV, OGG, M4A, MP4 up to 10 MB). Our casting team reviews submissions regularly.",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondarySilver
                         )
@@ -908,7 +908,7 @@ fun UserProfileScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "Official Help & Social Support (help.php)",
+                                    text = "Official Help & Social Support",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = TextPrimaryIvory,
                                     fontWeight = FontWeight.Bold
@@ -1005,7 +1005,7 @@ fun UserProfileScreen(
                 ProfileMenuRow(
                     icon = Icons.Default.WorkspacePremium,
                     title = "FREE & VIP Membership Status",
-                    subtitle = "GET /vip/status • JazzCash (03294806457) & WhatsApp",
+                    subtitle = "Check active plan and upgrade options",
                     testTag = "profile_nav_vip",
                     onClick = onNavigateToVip
                 )
@@ -1014,7 +1014,7 @@ fun UserProfileScreen(
                 ProfileMenuRow(
                     icon = Icons.Default.PlayArrow,
                     title = "Continue Watching",
-                    subtitle = "Resume in-progress movies and episodes",
+                    subtitle = "Resume in-progress dramas and episodes",
                     testTag = "profile_nav_continue_watching",
                     onClick = onNavigateToContinueWatching
                 )
@@ -1023,7 +1023,7 @@ fun UserProfileScreen(
                 ProfileMenuRow(
                     icon = Icons.Default.History,
                     title = "Watch History",
-                    subtitle = "GET / DELETE /user/history & local Room sync",
+                    subtitle = "Recently viewed dramas and episodes",
                     testTag = "profile_nav_watch_history",
                     onClick = onNavigateToWatchHistory
                 )
@@ -1032,7 +1032,7 @@ fun UserProfileScreen(
                 ProfileMenuRow(
                     icon = Icons.Default.Download,
                     title = "My VIP Downloads",
-                    subtitle = "POST /downloads/authorize • Keystore AES-256-GCM",
+                    subtitle = "Offline encrypted drama vault",
                     testTag = "profile_nav_downloads",
                     onClick = onNavigateToDownloads
                 )
@@ -1041,7 +1041,7 @@ fun UserProfileScreen(
                 ProfileMenuRow(
                     icon = Icons.Default.Notifications,
                     title = "Notifications",
-                    subtitle = "System & backend integration alerts",
+                    subtitle = "Drama releases and announcements",
                     testTag = "profile_nav_notifications",
                     onClick = onNavigateToNotifications
                 )
@@ -1049,8 +1049,8 @@ fun UserProfileScreen(
             item {
                 ProfileMenuRow(
                     icon = Icons.Default.Settings,
-                    title = "App Settings & API Base URL",
-                    subtitle = "GET /app/settings • GET /app/version • HTTPS config",
+                    title = "App Settings",
+                    subtitle = "Streaming server, cache and playback options",
                     testTag = "profile_nav_settings",
                     onClick = onNavigateToSettings
                 )
@@ -1058,8 +1058,8 @@ fun UserProfileScreen(
             item {
                 ProfileMenuRow(
                     icon = Icons.Default.Info,
-                    title = "About HaniX Urdu & Backend Checklist",
-                    subtitle = "${BackendEndpointCatalog.endpoints.size} PHP REST API v1 endpoints & shahkot.php compatibility",
+                    title = "About HaniX Urdu",
+                    subtitle = "App version, legal information & community",
                     testTag = "profile_nav_about",
                     onClick = onNavigateToAbout
                 )
@@ -1136,7 +1136,7 @@ fun WatchHistoryScreen(
     ) {
         HaniXTopBar(
             title = "Watch History",
-            subtitle = "GET / DELETE /user/history • Room Cache",
+            subtitle = "Your recently watched dramas and episodes",
             onBackClick = onBackClick
         )
 
@@ -1240,7 +1240,7 @@ fun ContinueWatchingScreen(
     ) {
         HaniXTopBar(
             title = "Continue Watching",
-            subtitle = "POST /playback/progress • Resume Queue",
+            subtitle = "Pick up right where you left off",
             onBackClick = onBackClick
         )
 
@@ -1292,7 +1292,7 @@ fun ContinueWatchingScreen(
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "When you pause a movie or episode mid-stream, your exact timestamp is saved here for instant resume.",
+                                text = "When you pause a drama or episode mid-stream, your exact timestamp is saved here for instant resume.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = TextSecondarySilver
                             )
@@ -1462,7 +1462,7 @@ fun NotificationsScreen(
     ) {
         HaniXTopBar(
             title = "Notifications",
-            subtitle = "System & Backend Status Alerts",
+            subtitle = "Drama releases and announcements",
             onBackClick = onBackClick
         )
 
@@ -1568,8 +1568,8 @@ fun AppSettingsScreen(
             .testTag("app_settings_screen")
     ) {
         HaniXTopBar(
-            title = "App & API Settings",
-            subtitle = "GET /app/settings • GET /app/version",
+            title = "App Settings",
+            subtitle = "Streaming server & preferences",
             onBackClick = onBackClick
         )
 
@@ -1582,13 +1582,13 @@ fun AppSettingsScreen(
                 VvipGlassCard(borderColor = VipChampagneGold.copy(alpha = 0.5f)) {
                     Column(modifier = Modifier.padding(18.dp)) {
                         Text(
-                            text = "Hostinger PHP REST API Base URL",
+                            text = "Streaming Gateway Server URL",
                             style = MaterialTheme.typography.titleMedium,
                             color = VipChampagneGold
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Default contract URL: ${BuildConfig.HANIX_API_BASE_URL}. Only HTTPS URLs (https://...) are accepted; cleartext HTTP is blocked at both the application and NetworkSecurityConfig levels.",
+                            text = "Configured streaming gateway: ${BuildConfig.HANIX_API_BASE_URL}. Secure HTTPS streaming is enforced for all media traffic.",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondarySilver
                         )
@@ -1597,7 +1597,7 @@ fun AppSettingsScreen(
                         OutlinedTextField(
                             value = editedUrl,
                             onValueChange = { editedUrl = it },
-                            label = { Text("HTTPS REST API v1 Base URL") },
+                            label = { Text("Streaming Server Gateway URL") },
                             singleLine = true,
                             colors = hanixTextFieldColors(),
                             modifier = Modifier
@@ -1681,8 +1681,8 @@ fun AboutHaniXScreen(
             .testTag("about_hanix_screen")
     ) {
         HaniXTopBar(
-            title = "About HaniX Urdu & API Checklist",
-            subtitle = "Hostinger PHP + MySQL & Multi-Server Streaming Architecture",
+            title = "About HaniX Urdu",
+            subtitle = "Official Urdu Dubbed Streaming Platform",
             onBackClick = onBackClick
         )
 
@@ -1695,41 +1695,35 @@ fun AboutHaniXScreen(
                 VvipGlassCard(borderColor = VipChampagneGold) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         Text(
-                            text = "HaniX Urdu Native Android Client v${BuildConfig.VERSION_NAME}",
+                            text = "HaniX Urdu Android v${BuildConfig.VERSION_NAME}",
                             style = MaterialTheme.typography.headlineSmall,
                             color = TextPrimaryIvory
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Shares your existing Hostinger MySQL database (`users`, `premium_users`, `movies`, `series`, `series_seasons`, `auditions`) with your existing PHP website without modifying or replacing `shahkot.php` or any existing web pages.",
+                            text = "The premier destination for high quality Turkish, Korean, and Chinese dramas dubbed and subtitled in Urdu. Stream smoothly across mobile and web with multi-server cinema playback.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextSecondarySilver
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "Configured Base URL: $apiBaseUrl",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = VipChampagneGold
-                        )
                     }
                 }
             }
 
             item {
-                VvipGlassCard(borderColor = AmberPending.copy(alpha = 0.7f)) {
+                VvipGlassCard(borderColor = VipChampagneGold.copy(alpha = 0.6f)) {
                     Column(modifier = Modifier.padding(18.dp)) {
                         Text(
-                            text = "Security & Membership Policy (Section 4 & 10)",
+                            text = "Key Features",
                             style = MaterialTheme.typography.titleMedium,
-                            color = AmberPending
+                            color = VipChampagneGold
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "• Strictly two membership plans: FREE and VIP only.\n" +
-                                "• Every new user starts as FREE; VIP is verified against `premium_users` by `email` and `expiry_date > NOW()`.\n" +
-                                "• JazzCash VIP Activation: Muhammad Hasnain (03294806457) + WhatsApp (+92 316 0450074).\n" +
-                                "• Supports native Media3 ExoPlayer (MP4/HLS) + Main Server / Server 2 embeds (YouTube, Rumble, Dailymotion, Google Drive /preview).\n" +
-                                "• Zero MySQL database credentials, admin secrets, or Bunny Stream API keys are packaged in the APK.",
+                            text = "• Multi-Server HD Cinema Player (Main Server, Server 2 & Direct Web Player)\n" +
+                                "• Professional Urdu Dubbing & Authentic Subtitles\n" +
+                                "• VIP Membership with Instant JazzCash Activation\n" +
+                                "• App-Private Encrypted Offline Vault for Downloaded Dramas\n" +
+                                "• Seamless Watch History & Resume Playback",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondarySilver
                         )
@@ -1738,48 +1732,16 @@ fun AboutHaniXScreen(
             }
 
             item {
-                Text(
-                    text = "Required PHP REST API v1 Endpoints (${BackendEndpointCatalog.endpoints.size} Routes)",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = VipChampagneGold
-                )
-            }
-
-            items(BackendEndpointCatalog.endpoints, key = { "${it.method}_${it.path}" }) { spec ->
-                VvipGlassCard(borderColor = GlassBorderSubtle) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                color = VipGoldDark.copy(alpha = 0.35f),
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
-                                Text(
-                                    text = "${spec.method} ${spec.path}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = VipGoldLight,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                            Text(
-                                text = spec.category,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = TextMutedSlate
-                            )
-                        }
+                VvipGlassCard(borderColor = EmeraldVerified.copy(alpha = 0.6f)) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Text(
+                            text = "Community & Support",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = EmeraldVerified
+                        )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Maps from existing PHP: ${spec.legacyPhpReference}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = VipChampagneGold
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = spec.securityRequirement,
+                            text = "Official Website: hanixurdu.com\nWhatsApp Support: +92 316 0450074\nEmail: hannnix88@gmail.com",
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondarySilver
                         )

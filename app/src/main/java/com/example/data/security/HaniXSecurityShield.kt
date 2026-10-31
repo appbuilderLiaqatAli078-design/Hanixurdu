@@ -125,7 +125,7 @@ object HaniXSecurityShield {
 
     /**
      * JavaScript shield injected into WebViews to block `captureStream()`, audio extraction,
-     * context-menu link copying, and video source URL inspection.
+     * context-menu link copying, and video source URL inspection without crashing media engine scripts.
      */
     fun buildWebViewAudioAndLinkProtectionJs(): String {
         return """
@@ -133,18 +133,15 @@ object HaniXSecurityShield {
                 try {
                     document.addEventListener('contextmenu', function(e) { e.preventDefault(); }, false);
                     document.addEventListener('selectstart', function(e) { e.preventDefault(); }, false);
-                    if (typeof HTMLMediaElement !== 'undefined') {
-                        var blockCapture = function() {
-                            throw new DOMException('Audio capture is disabled by HaniX Urdu DRM.', 'NotAllowedError');
-                        };
-                        HTMLMediaElement.prototype.captureStream = blockCapture;
-                        HTMLMediaElement.prototype.mozCaptureStream = blockCapture;
-                        HTMLMediaElement.prototype.webkitCaptureStream = blockCapture;
+                    if (typeof HTMLMediaElement !== 'undefined' && HTMLMediaElement.prototype) {
+                        var noopCapture = function() { return null; };
+                        try { HTMLMediaElement.prototype.captureStream = noopCapture; } catch(e) {}
+                        try { HTMLMediaElement.prototype.mozCaptureStream = noopCapture; } catch(e) {}
+                        try { HTMLMediaElement.prototype.webkitCaptureStream = noopCapture; } catch(e) {}
                     }
                     var mediaEls = document.querySelectorAll('video, audio');
                     for (var i = 0; i < mediaEls.length; i++) {
-                        mediaEls[i].setAttribute('controlsList', 'nodownload noplaybackrate');
-                        mediaEls[i].setAttribute('disablePictureInPicture', 'true');
+                        mediaEls[i].setAttribute('controlsList', 'nodownload');
                         mediaEls[i].oncontextmenu = function() { return false; };
                     }
                 } catch (err) {}

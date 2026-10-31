@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -256,9 +257,9 @@ fun HaniXBottomNavBar(
             val selected = currentRoute == tab.route
             val icon = when (tab) {
                 BottomNavTab.HOME -> Icons.Default.Home
-                BottomNavTab.MOVIES -> Icons.Default.Movie
+                BottomNavTab.DRAMAS -> Icons.Default.VideoLibrary
                 BottomNavTab.SERIES -> Icons.Default.LiveTv
-                BottomNavTab.DOWNLOADS -> Icons.Default.Download
+                BottomNavTab.VIP -> Icons.Default.WorkspacePremium
                 BottomNavTab.PROFILE -> Icons.Default.Person
             }
             NavigationBarItem(
@@ -346,18 +347,10 @@ fun <T> ContractStateBanner(
                     Spacer(modifier = Modifier.width(14.dp))
                     Column {
                         Text(
-                            text = "Loading HaniX Urdu Stream...",
+                            text = "Loading HaniX Urdu Streams...",
                             style = MaterialTheme.typography.titleMedium,
                             color = TextPrimaryIvory
                         )
-                        val cleanEndpoint = HaniXSecurityShield.sanitizeUiLabel(state.endpoint)
-                        if (!cleanEndpoint.isNullOrBlank()) {
-                            Text(
-                                text = cleanEndpoint,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = VipChampagneGold
-                            )
-                        }
                     }
                 }
             }
@@ -379,7 +372,7 @@ fun <T> ContractStateBanner(
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Authentication Required (${state.endpoint})",
+                            text = "Sign-In Required",
                             style = MaterialTheme.typography.titleMedium,
                             color = VipGoldLight
                         )
@@ -399,7 +392,7 @@ fun <T> ContractStateBanner(
                         ),
                         modifier = Modifier.testTag("auth_required_retry_button")
                     ) {
-                        Text("Retry Request", fontWeight = FontWeight.Bold)
+                        Text("Sign In / Retry", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -422,8 +415,8 @@ fun <T> ContractStateBanner(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Code,
-                                contentDescription = "Backend Unavailable / Pending Route",
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refreshing content",
                                 tint = AmberPending,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -431,13 +424,13 @@ fun <T> ContractStateBanner(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Backend Route Pending on Hostinger",
+                                text = "Stream Refreshing",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = AmberPending,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Contract: ${state.endpoint}  •  Legacy PHP: ${state.legacyPhpFile}",
+                                text = "Synchronizing latest Urdu episodes",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = VipGoldLight
                             )
@@ -445,46 +438,27 @@ fun <T> ContractStateBanner(
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = state.details,
+                        text = "This channel is refreshing its stream servers. Tap retry to reconnect.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondarySilver
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Button(
+                        onClick = onRetry,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = VipChampagneGold,
+                            contentColor = OledBlack
+                        ),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                        modifier = Modifier.testTag("retry_endpoint_button")
                     ) {
-                        Button(
-                            onClick = onRetry,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = VipChampagneGold,
-                                contentColor = OledBlack
-                            ),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                            modifier = Modifier.testTag("retry_endpoint_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Retry request",
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Retry Connection", style = MaterialTheme.typography.labelLarge)
-                        }
-                        if (onOpenChecklist != null) {
-                            OutlinedButton(
-                                onClick = onOpenChecklist,
-                                border = BorderStroke(1.dp, VipChampagneGold.copy(alpha = 0.6f)),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                                modifier = Modifier.testTag("open_integration_checklist_button")
-                            ) {
-                                Text(
-                                    text = "PHP Mapping Guide",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = VipChampagneGold
-                                )
-                            }
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Retry request",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Retry Connection", style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }
@@ -506,7 +480,7 @@ fun <T> ContractStateBanner(
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Network Failure / Offline (${state.endpoint})",
+                            text = "Connection Offline",
                             style = MaterialTheme.typography.titleMedium,
                             color = TextPrimaryIvory
                         )

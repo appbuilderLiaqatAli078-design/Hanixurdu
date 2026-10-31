@@ -6,8 +6,10 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.graphics.Bitmap
 import android.media.AudioManager
 import android.net.Uri
+import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -99,6 +101,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -1241,14 +1244,14 @@ fun VideoPlayerScreen(
     ) {
         if (!isFullscreen) {
             HaniXTopBar(
-                title = "MovieBox Cinema Player",
-                subtitle = "Multi-Server HD • Audio Copy Protected",
+                title = "HaniX Cinema Player",
+                subtitle = "Multi-Server HD • Live Stream",
                 onBackClick = onBackClick,
                 onVipClick = onNavigateToVip
             )
         }
 
-        // MovieBox Cinema Viewport (16:9 in Portrait, 100% Fullscreen in Landscape)
+        // Cinema Viewport (16:9 in Portrait, 100% Fullscreen in Landscape)
         Box(
             modifier = if (isFullscreen) {
                 Modifier
@@ -1268,21 +1271,30 @@ fun VideoPlayerScreen(
                     val exoPlayer = playerManager.getPlayer()
 
                     if (current.playbackType == "webpage") {
-                        // Direct Web Player with audio capture block + isolated video container
+                        // Direct Web Player with hardware acceleration and clean container
                         val webHeaders = mapOf("Referer" to "https://hanixurdu.com/")
                         AndroidView(
                             factory = { ctx ->
                                 WebView(ctx).apply {
                                     activeWebViewRef = this
+                                    setLayerType(View.LAYER_TYPE_HARDWARE, null)
                                     settings.javaScriptEnabled = true
                                     settings.domStorageEnabled = true
+                                    settings.databaseEnabled = true
+                                    settings.allowFileAccess = true
+                                    settings.allowContentAccess = true
                                     settings.mediaPlaybackRequiresUserGesture = false
                                     settings.loadWithOverviewMode = true
                                     settings.useWideViewPort = true
-                                    settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                                    settings.cacheMode = WebSettings.LOAD_DEFAULT
+                                    settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                                     settings.userAgentString =
                                         "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
-                                    webChromeClient = WebChromeClient()
+                                    webChromeClient = object : WebChromeClient() {
+                                        override fun getDefaultVideoPoster(): Bitmap? {
+                                            return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+                                        }
+                                    }
                                     webViewClient = object : WebViewClient() {
                                         override fun onPageFinished(view: WebView?, url: String?) {
                                             super.onPageFinished(view, url)
@@ -1295,10 +1307,17 @@ fun VideoPlayerScreen(
                                                         }
                                                         var vipSec = document.getElementById('vip-section');
                                                         if (vipSec) vipSec.style.display = 'none';
-                                                        var vidSec = document.getElementById('video-section');
-                                                        if (vidSec) vidSec.style.display = 'block';
-                                                        var hideSelectors = ['header', '.navbar', 'footer', '.Rec-section', '.server-buttons', '.movie-info', '#vipModal', '.mind-game-btn'];
-                                                        hideSelectors.forEach(function(sel) {
+                                                        var pCont = document.getElementById('player-container') || document.querySelector('.video-container');
+                                                        if (pCont) {
+                                                            pCont.style.width = '100vw';
+                                                            pCont.style.height = '100vh';
+                                                            pCont.style.position = 'fixed';
+                                                            pCont.style.top = '0';
+                                                            pCont.style.left = '0';
+                                                            pCont.style.zIndex = '99999';
+                                                        }
+                                                        var toHide = ['header', '.navbar', 'footer', '#vipModal'];
+                                                        toHide.forEach(function(sel) {
                                                             var els = document.querySelectorAll(sel);
                                                             for (var i = 0; i < els.length; i++) {
                                                                 els[i].style.display = 'none';
@@ -1345,15 +1364,24 @@ fun VideoPlayerScreen(
                             factory = { ctx ->
                                 WebView(ctx).apply {
                                     activeWebViewRef = this
+                                    setLayerType(View.LAYER_TYPE_HARDWARE, null)
                                     settings.javaScriptEnabled = true
                                     settings.domStorageEnabled = true
+                                    settings.databaseEnabled = true
+                                    settings.allowFileAccess = true
+                                    settings.allowContentAccess = true
                                     settings.mediaPlaybackRequiresUserGesture = false
                                     settings.loadWithOverviewMode = true
                                     settings.useWideViewPort = true
-                                    settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                                    settings.cacheMode = WebSettings.LOAD_DEFAULT
+                                    settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                                     settings.userAgentString =
                                         "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
-                                    webChromeClient = WebChromeClient()
+                                    webChromeClient = object : WebChromeClient() {
+                                        override fun getDefaultVideoPoster(): Bitmap? {
+                                            return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+                                        }
+                                    }
                                     webViewClient = object : WebViewClient() {
                                         override fun onPageFinished(view: WebView?, url: String?) {
                                             super.onPageFinished(view, url)
@@ -2331,11 +2359,11 @@ fun VideoPlayerScreen(
                     }
                 }
 
-                // 5. Recommended Movies / Series Rail
+                // 5. Recommended Dramas Rail
                 if (recommendedMovies.isNotEmpty()) {
                     item {
                         Text(
-                            text = "Recommended For You",
+                            text = "Recommended Dramas",
                             style = MaterialTheme.typography.titleMedium,
                             color = VipChampagneGold,
                             fontWeight = FontWeight.Bold
@@ -2359,47 +2387,33 @@ fun VideoPlayerScreen(
                     }
                 }
 
-                if (playbackAuthState !is RemoteDataState.Success) {
+                if (playbackAuthState is RemoteDataState.Error) {
                     item {
-                        ContractStateBanner(
-                            state = playbackAuthState,
-                            onRetry = { onAuthorizePlayback(contentType, contentId) },
-                            onOpenChecklist = onOpenChecklist
-                        )
-                    }
-                }
-
-                item {
-                    VvipGlassCard(borderColor = VipChampagneGold.copy(alpha = 0.45f)) {
-                        Column(modifier = Modifier.padding(18.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Security,
-                                    contentDescription = null,
-                                    tint = EmeraldVerified
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
+                        Card(
+                            colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = CharcoalSurface),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, CinemaCrimson.copy(alpha = 0.5f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
                                 Text(
-                                    text = "HaniX Security Shield & Audio Protection Active",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = TextPrimaryIvory
+                                    text = playbackAuthState.message.ifBlank { "Could not load video. Please switch servers or retry." },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = AmberPending,
+                                    textAlign = TextAlign.Center
                                 )
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            val steps = listOf(
-                                "1. SSL/TLS 1.3 Certificate Pinning & No-Proxy lock active on all requests",
-                                "2. Screen recording is permitted for video while internal audio capture is blocked (ALLOW_CAPTURE_BY_NONE)",
-                                "3. Offline downloads are AES-256-GCM encrypted in app-private storage with .nomedia (never in Gallery)",
-                                "4. Zero API URLs, PHP filenames, or raw stream tokens are exposed in UI or logcat",
-                                "5. VIP users automatically unlock all VIP episodes and multi-server streams"
-                            )
-                            steps.forEach { step ->
-                                Text(
-                                    text = step,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = TextSecondarySilver,
-                                    modifier = Modifier.padding(vertical = 3.dp)
-                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(
+                                    onClick = { onAuthorizePlayback(contentType, contentId) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = CinemaCrimson)
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Retry Playback", fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
@@ -2425,8 +2439,25 @@ private fun buildResponsivePlayerHtml(streamUrl: String, isDirectVideoFile: Bool
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <style>
-                html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; user-select: none; -webkit-user-select: none; }
-                video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+                * { box-sizing: border-box; }
+                html, body {
+                    margin: 0;
+                    padding: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: #000;
+                    overflow: hidden;
+                    position: relative;
+                }
+                video {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    object-fit: contain;
+                    background: #000;
+                }
             </style>
         </head>
         <body oncontextmenu="return false;">
@@ -2441,8 +2472,25 @@ private fun buildResponsivePlayerHtml(streamUrl: String, isDirectVideoFile: Bool
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <style>
-                html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; user-select: none; -webkit-user-select: none; }
-                iframe { width: 100%; height: 100%; border: 0; background: #000; }
+                * { box-sizing: border-box; }
+                html, body {
+                    margin: 0;
+                    padding: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: #000;
+                    overflow: hidden;
+                    position: relative;
+                }
+                iframe {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    border: none;
+                    background: #000;
+                }
             </style>
         </head>
         <body oncontextmenu="return false;">

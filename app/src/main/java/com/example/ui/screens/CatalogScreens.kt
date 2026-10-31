@@ -57,6 +57,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -245,19 +246,52 @@ fun HomeScreen(
                             )
                         }
                     }
-                } else {
+                } else if (homeState is RemoteDataState.Error) {
                     item {
-                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            ContractStateBanner(
-                                state = homeState,
-                                onRetry = onRefreshHome,
-                                onOpenChecklist = onNavigateToAbout
-                            )
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = CharcoalSurface),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, CinemaCrimson.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = homeState.message.ifBlank { "Could not load content. Please check internet connection." },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = TextPrimaryIvory,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(
+                                    onClick = onRefreshHome,
+                                    colors = ButtonDefaults.buttonColors(containerColor = CinemaCrimson)
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Retry", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                } else if (homeState is RemoteDataState.Loading) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = VipChampagneGold, strokeWidth = 2.5.dp)
                         }
                     }
                 }
 
-                // Quick Navigation Bar (Categories, Continue Watching, Watch History, Studio, Help, API Settings)
+                // Quick Navigation Bar (Categories, Studio, Mind Games, VIP, Continue Watching, History, Help)
                 item {
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
@@ -319,14 +353,6 @@ fun HomeScreen(
                                 onClick = onNavigateToProfile
                             )
                         }
-                        item {
-                            QuickNavPill(
-                                icon = Icons.Default.Settings,
-                                label = "API Settings",
-                                testTag = "home_quick_settings",
-                                onClick = onNavigateToSettings
-                            )
-                        }
                     }
                 }
 
@@ -377,11 +403,11 @@ fun HomeScreen(
                     }
                 }
 
-                // 2. All 5 Live `index.php` Category Rails with Numbered Rank Badges (`1, 2, 3...`)
+                // 2. All 5 Live Category Rails with Drama Titles
                 if (homeState is RemoteDataState.Success) {
                     val payload = homeState.data
 
-                    // Section 1: Urdu Subtitles (16:9 Landscape cards matching `.trending-card.landscape-card`)
+                    // Section 1: Urdu Subtitles
                     if (!payload.urduSubtitles.isNullOrEmpty()) {
                         item {
                             WebsiteCategoryRail(
@@ -395,11 +421,11 @@ fun HomeScreen(
                         }
                     }
 
-                    // Section 2: All Content
+                    // Section 2: All Dramas
                     if (!payload.allContent.isNullOrEmpty()) {
                         item {
                             WebsiteCategoryRail(
-                                title = "All Content",
+                                title = "All Dramas",
                                 items = payload.allContent,
                                 isLandscape = false,
                                 keyPrefix = "all",
@@ -423,11 +449,11 @@ fun HomeScreen(
                         }
                     }
 
-                    // Section 4: Hanix Originals (`fan_dubbing`)
+                    // Section 4: HaniX Originals
                     if (!payload.hanixOriginals.isNullOrEmpty()) {
                         item {
                             WebsiteCategoryRail(
-                                title = "Hanix Originals",
+                                title = "HaniX Originals",
                                 items = payload.hanixOriginals,
                                 isLandscape = false,
                                 keyPrefix = "orig",
@@ -437,11 +463,11 @@ fun HomeScreen(
                         }
                     }
 
-                    // Section 5: Premium (VIP Exclusive)
+                    // Section 5: VIP Exclusives
                     if (!payload.premiumContent.isNullOrEmpty()) {
                         item {
                             WebsiteCategoryRail(
-                                title = "Premium",
+                                title = "VIP Exclusives",
                                 items = payload.premiumContent,
                                 isLandscape = false,
                                 keyPrefix = "prem",
@@ -1677,8 +1703,8 @@ fun MoviesScreen(
             .testTag("movies_screen")
     ) {
         HaniXTopBar(
-            title = "Urdu & Dubbed Movies",
-            subtitle = if (selectedCategory == null) "Live hanixurdu.com Catalog" else "Category: $selectedCategory",
+            title = "Urdu & Dubbed Dramas",
+            subtitle = if (selectedCategory == null) "All Dramas" else "Category: $selectedCategory",
             unreadNotifications = unreadNotifications,
             onSearchClick = onSearchClick,
             onNotificationsClick = onNotificationsClick
@@ -1698,7 +1724,7 @@ fun MoviesScreen(
                 FilterChip(
                     selected = selectedCategory == null,
                     onClick = { onLoadMovies(null) },
-                    label = { Text("All Content") },
+                    label = { Text("All Dramas") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = VipChampagneGold,
                         selectedLabelColor = OledBlack
@@ -1711,15 +1737,48 @@ fun MoviesScreen(
                 ) {
                     Icon(Icons.Default.Category, contentDescription = null, tint = VipChampagneGold, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Filter by Category", color = VipGoldLight)
+                    Text("Categories", color = VipGoldLight)
                 }
             }
 
-            ContractStateBanner(
-                state = moviesState,
-                onRetry = { onLoadMovies(selectedCategory) },
-                onOpenChecklist = onOpenChecklist
-            )
+            if (moviesState is RemoteDataState.Loading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = VipChampagneGold, strokeWidth = 2.5.dp)
+                }
+            } else if (moviesState is RemoteDataState.Error) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CharcoalSurface),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, CinemaCrimson.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = moviesState.message.ifBlank { "Could not load dramas. Please try again." },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextPrimaryIvory,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = { onLoadMovies(selectedCategory) },
+                            colors = ButtonDefaults.buttonColors(containerColor = CinemaCrimson)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Retry", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
 
             val moviesToDisplay: List<Movie> = when (moviesState) {
                 is RemoteDataState.Success -> moviesState.data
@@ -1776,7 +1835,7 @@ fun SeriesScreen(
     ) {
         HaniXTopBar(
             title = "Series & Seasons",
-            subtitle = if (selectedCategory == null) "hanixurdu.com/series.php" else "Category: $selectedCategory",
+            subtitle = if (selectedCategory == null) "Turkish & Historical Series" else "Category: $selectedCategory",
             unreadNotifications = unreadNotifications,
             onSearchClick = onSearchClick,
             onNotificationsClick = onNotificationsClick
@@ -1813,11 +1872,44 @@ fun SeriesScreen(
                 }
             }
 
-            ContractStateBanner(
-                state = seriesState,
-                onRetry = { onLoadSeries(selectedCategory) },
-                onOpenChecklist = onOpenChecklist
-            )
+            if (seriesState is RemoteDataState.Loading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = VipChampagneGold, strokeWidth = 2.5.dp)
+                }
+            } else if (seriesState is RemoteDataState.Error) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CharcoalSurface),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, CinemaCrimson.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = seriesState.message.ifBlank { "Could not load series. Please try again." },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextPrimaryIvory,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = { onLoadSeries(selectedCategory) },
+                            colors = ButtonDefaults.buttonColors(containerColor = CinemaCrimson)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Retry", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
 
             val seriesToDisplay: List<Series> = when (seriesState) {
                 is RemoteDataState.Success -> seriesState.data
@@ -1871,7 +1963,7 @@ fun CategoriesScreen(
     ) {
         HaniXTopBar(
             title = "Content Categories",
-            subtitle = "hanixurdu.com Category Rails",
+            subtitle = "Browse by Category",
             onBackClick = onBackClick
         )
 
@@ -1880,12 +1972,34 @@ fun CategoriesScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            item {
-                ContractStateBanner(
-                    state = categoriesState,
-                    onRetry = onLoadCategories,
-                    onOpenChecklist = onOpenChecklist
-                )
+            if (categoriesState is RemoteDataState.Loading) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = VipChampagneGold, strokeWidth = 2.5.dp)
+                    }
+                }
+            } else if (categoriesState is RemoteDataState.Error) {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CharcoalSurface),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, CinemaCrimson.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = categoriesState.message.ifBlank { "Could not load categories." },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextPrimaryIvory,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Button(onClick = onLoadCategories, colors = ButtonDefaults.buttonColors(containerColor = CinemaCrimson)) {
+                                Text("Retry", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
             }
 
             if (categoriesState is RemoteDataState.Success) {
@@ -1909,7 +2023,7 @@ fun CategoriesScreen(
                                 )
                                 if (category.itemCount != null) {
                                     Text(
-                                        text = "${category.itemCount} titles in MySQL catalog",
+                                        text = "${category.itemCount} titles available",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = TextSecondarySilver
                                     )
@@ -1917,7 +2031,7 @@ fun CategoriesScreen(
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedButton(onClick = { onSelectCategoryForMovies(category.id) }) {
-                                    Text("Movies", color = VipChampagneGold)
+                                    Text("Dramas", color = VipChampagneGold)
                                 }
                                 OutlinedButton(onClick = { onSelectCategoryForSeries(category.id) }) {
                                     Text("Series", color = VipGoldLight)
@@ -1932,7 +2046,7 @@ fun CategoriesScreen(
 }
 
 // =========================================================================
-// 10. SEARCH SCREEN (GET /search?q={query} -> search.php)
+// 10. SEARCH SCREEN
 // =========================================================================
 
 @Composable
@@ -1954,7 +2068,7 @@ fun SearchScreen(
     ) {
         HaniXTopBar(
             title = "Search HaniX Catalog",
-            subtitle = "hanixurdu.com/search.php Live Search",
+            subtitle = "Search Dramas & Series",
             onBackClick = onBackClick
         )
 
@@ -2012,11 +2126,31 @@ fun SearchScreen(
                 }
             }
 
-            ContractStateBanner(
-                state = searchState,
-                onRetry = { if (query.isNotBlank()) onExecuteSearch(query) },
-                onOpenChecklist = onOpenChecklist
-            )
+            if (searchState is RemoteDataState.Loading) {
+                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = VipChampagneGold, strokeWidth = 2.5.dp)
+                }
+            } else if (searchState is RemoteDataState.Error) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CharcoalSurface),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, CinemaCrimson.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = searchState.message.ifBlank { "Search failed. Please try again." },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextPrimaryIvory,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(onClick = { if (query.isNotBlank()) onExecuteSearch(query) }, colors = ButtonDefaults.buttonColors(containerColor = CinemaCrimson)) {
+                            Text("Retry", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
 
             if (searchState is RemoteDataState.Success) {
                 val movies = searchState.data.movies.orEmpty()
@@ -2045,7 +2179,7 @@ fun SearchScreen(
                     if (movies.isNotEmpty()) {
                         item {
                             Text(
-                                text = "Matching Episodes & Movies (${movies.size})",
+                                text = "Matching Dramas & Episodes (${movies.size})",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = VipChampagneGold
                             )

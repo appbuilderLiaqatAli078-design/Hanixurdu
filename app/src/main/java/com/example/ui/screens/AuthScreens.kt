@@ -171,8 +171,7 @@ fun SplashScreen(
 private data class OnboardingSlide(
     val badge: String,
     val title: String,
-    val description: String,
-    val phpReference: String
+    val description: String
 )
 
 @Composable
@@ -182,22 +181,19 @@ fun OnboardingScreen(
 ) {
     val slides = listOf(
         OnboardingSlide(
-            badge = "UNIFIED HOSTINGER BACKEND",
-            title = "One Account Across Web & Android",
-            description = "Directly connects to your existing Hostinger MySQL database (`u471204769_hanix_db`) via the /api/v1/ REST contract. Movies, Series, Seasons, Episodes, Mind Games, and FREE/VIP membership stay synchronized with hanixurdu.com.",
-            phpReference = "Shares data with index.php, series.php, view_series.php & shahkot.php"
+            badge = "PREMIUM URDU STREAMING",
+            title = "All Your Favorite Urdu Dramas",
+            description = "Explore Turkish, Korean, Chinese, and Pakistani dramas with high-quality Urdu subtitles and authentic dubbing, synchronized across web and mobile."
         ),
         OnboardingSlide(
-            badge = "EXOPLAYER + MULTI-SERVER EMBEDS",
-            title = "Multi-Source Cinema Playback",
-            description = "Supports native Media3 ExoPlayer (for direct video_path MP4s and signed Bunny Stream HLS) plus Main Server & Server 2 switching for YouTube, Rumble, Dailymotion, and Google Drive /preview sources.",
-            phpReference = "Matches run_video.php multi-server & check_premium.php logic"
+            badge = "MULTI-SERVER HD PLAYBACK",
+            title = "Smooth Cinema Experience",
+            description = "Switch seamlessly between Main Server, Server 2, and Direct Web Player with gesture controls, custom aspect ratios, and full playback speed options."
         ),
         OnboardingSlide(
-            badge = "FREE & VIP MEMBERSHIP",
-            title = "JazzCash & WhatsApp VIP Activation",
-            description = "Every account starts as FREE. Upgrade to VIP via JazzCash (03294806457 — Muhammad Hasnain) and WhatsApp activation (923160450074) verified against premium_users.expiry_date.",
-            phpReference = "Integrates with check_premium.php, add_premium.php, unlock_vip.php & shahkot.php"
+            badge = "VIP PASS & OFFLINE VAULT",
+            title = "Instant VIP & Encrypted Downloads",
+            description = "Unlock all VIP episodes with instant JazzCash activation, and download your favorite series securely into your private offline vault."
         )
     )
 
@@ -291,12 +287,6 @@ fun OnboardingScreen(
                         text = currentSlide.description,
                         style = MaterialTheme.typography.bodyLarge,
                         color = TextSecondarySilver
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = currentSlide.phpReference,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = VipChampagneGold
                     )
                 }
             }
@@ -398,8 +388,8 @@ fun LoginScreen(
             .testTag("login_screen")
     ) {
         HaniXTopBar(
-            title = "Sign In to HaniX Urdu",
-            subtitle = "POST /auth/login • Shared Hostinger Account",
+            title = "Sign In",
+            subtitle = "Access your HaniX Urdu account",
             onBackClick = onBackOrContinue
         )
 
@@ -420,7 +410,7 @@ fun LoginScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Use your existing hanixurdu.com account credentials (`users.email` & `users.password`). Password verification (`password_verify`) and VIP status (`premium_users.expiry_date`) are resolved on the Hostinger PHP backend.",
+                        text = "Enter your email and password to access your watchlist, VIP streams, and watch history.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondarySilver
                     )
@@ -519,7 +509,7 @@ fun LoginScreen(
                             .testTag("login_submit_button")
                     ) {
                         Text(
-                            text = "Authenticate with Hostinger API",
+                            text = "Sign In",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -550,14 +540,6 @@ fun LoginScreen(
                     Text("Create Account", color = VipChampagneGold, fontWeight = FontWeight.Bold)
                 }
             }
-
-            Text(
-                text = "Target API: $apiBaseUrl",
-                style = MaterialTheme.typography.labelSmall,
-                color = TextMutedSlate,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 }
@@ -595,8 +577,8 @@ fun RegisterScreen(
             .testTag("register_screen")
     ) {
         HaniXTopBar(
-            title = "Create HaniX Account",
-            subtitle = "POST /auth/register • Bridges signup.php",
+            title = "Create Account",
+            subtitle = "Join HaniX Urdu streaming",
             onBackClick = onBackClick
         )
 
@@ -615,7 +597,7 @@ fun RegisterScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Registers a shared account in `users (email, password, secret_pin)` on your Hostinger MySQL database. Every new account starts on the FREE plan.",
+                        text = "Create your account to enjoy unlimited Turkish, Korean, and Chinese Urdu-dubbed dramas.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondarySilver
                     )
@@ -706,7 +688,7 @@ fun RegisterScreen(
                             secretPin = it
                             validationError = null
                         },
-                        label = { Text("Secret Recovery PIN (4+ digits — signup.php)") },
+                        label = { Text("Secret Recovery PIN (4+ digits)") },
                         leadingIcon = {
                             Icon(Icons.Default.Key, contentDescription = "Secret PIN", tint = VipChampagneGold)
                         },
@@ -759,7 +741,7 @@ fun RegisterScreen(
                             .testTag("register_submit_button")
                     ) {
                         Text(
-                            text = "Register Account via API",
+                            text = "Create Account",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -826,7 +808,7 @@ fun ForgotPasswordScreen(
     ) {
         HaniXTopBar(
             title = "Password Recovery",
-            subtitle = "POST /auth/forgot-password • forgot_password.php",
+            subtitle = "Reset your HaniX account password",
             onBackClick = onBackClick
         )
 
@@ -839,13 +821,13 @@ fun ForgotPasswordScreen(
             VvipGlassCard(borderColor = VipChampagneGold.copy(alpha = 0.45f)) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(
-                        text = "Reset Your HaniX Password",
+                        text = "Reset Your Password",
                         style = MaterialTheme.typography.headlineSmall,
                         color = TextPrimaryIvory
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Matches forgot_password.php: verify your registered Email + Secret Recovery PIN (`users.secret_pin`), then set a new password (minimum 8 characters).",
+                        text = "Enter your registered email address and secret recovery PIN, then create a new password.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondarySilver
                     )
@@ -877,7 +859,7 @@ fun ForgotPasswordScreen(
                             secretPin = it
                             localError = null
                         },
-                        label = { Text("Secret Recovery PIN (from signup.php)") },
+                        label = { Text("Secret Recovery PIN") },
                         leadingIcon = {
                             Icon(Icons.Default.Key, contentDescription = "Secret PIN", tint = VipChampagneGold)
                         },
@@ -1003,7 +985,7 @@ fun ForgotPasswordScreen(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Password recovery / reset completed via POST /auth/forgot-password.",
+                            text = "Password reset successful! You can now sign in with your new password.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextPrimaryIvory
                         )

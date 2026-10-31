@@ -48,8 +48,8 @@ enum class BottomNavTab(
     val testTag: String
 ) {
     HOME(HaniXRoutes.HOME, "Home", "bottom_nav_home"),
-    MOVIES(HaniXRoutes.MOVIES, "Movies", "bottom_nav_movies"),
+    DRAMAS(HaniXRoutes.MOVIES, "Dramas", "bottom_nav_dramas"),
     SERIES(HaniXRoutes.SERIES, "Series", "bottom_nav_series"),
-    DOWNLOADS(HaniXRoutes.MY_DOWNLOADS, "Downloads", "bottom_nav_downloads"),
+    VIP(HaniXRoutes.VIP_MEMBERSHIP, "VIP", "bottom_nav_vip"),
     PROFILE(HaniXRoutes.USER_PROFILE, "Profile", "bottom_nav_profile")
 }

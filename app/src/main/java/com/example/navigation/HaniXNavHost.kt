@@ -98,7 +98,7 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
         HaniXRoutes.HOME,
         HaniXRoutes.MOVIES,
         HaniXRoutes.SERIES,
-        HaniXRoutes.MY_DOWNLOADS,
+        HaniXRoutes.VIP_MEMBERSHIP,
         HaniXRoutes.USER_PROFILE
     )
 
