@@ -21,7 +21,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -64,6 +68,8 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -134,6 +140,11 @@ import com.example.ui.components.ContractStateBanner
 import com.example.ui.components.HaniXTopBar
 import com.example.ui.components.MoviePosterCard
 import com.example.ui.components.VvipGlassCard
+import com.example.ui.components.Cinema3DButton
+import com.example.ui.components.Cinema3DButtonVariant
+import com.example.ui.components.FloatingChatButton
+import com.example.ui.components.FloatingMindGamesPill
+import com.example.ui.components.WhatsAppFollowPill
 import com.example.ui.theme.AmberPending
 import com.example.ui.theme.CharcoalSurface
 import com.example.ui.theme.CinemaCrimson
@@ -173,6 +184,7 @@ fun MovieDetailsScreen(
     onBackClick: () -> Unit,
     onOpenChecklist: () -> Unit
 ) {
+    val context = LocalContext.current
     LaunchedEffect(movieId) {
         onLoadMovie(movieId)
     }
@@ -305,36 +317,24 @@ fun MovieDetailsScreen(
                             color = TextSecondarySilver
                         )
                         Spacer(modifier = Modifier.height(14.dp))
-                        Button(
+                        Cinema3DButton(
+                            text = "▶ Watch Now (MovieBox Player)",
                             onClick = { onPlayMovie(movieId) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = CinemaCrimson,
-                                contentColor = Color.White
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .testTag("movie_authorize_playback_button")
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("▶ Watch Now (MovieBox Player)", fontWeight = FontWeight.Bold)
-                        }
+                            variant = Cinema3DButtonVariant.Crimson,
+                            modifier = Modifier.fillMaxWidth(),
+                            testTag = "movie_authorize_playback_button"
+                        )
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                        OutlinedButton(
+                        Cinema3DButton(
+                            text = "Save to Private App Vault (No Gallery)",
                             onClick = { onDownloadMovie(movieId) },
-                            border = BorderStroke(1.dp, VipChampagneGold),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .testTag("movie_authorize_download_button")
-                        ) {
-                            Icon(Icons.Default.Download, contentDescription = null, tint = VipChampagneGold)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Save to Private App Vault (No Gallery)", color = VipGoldLight)
-                        }
+                            variant = Cinema3DButtonVariant.Gold,
+                            icon = { Icon(Icons.Default.Download, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            testTag = "movie_authorize_download_button"
+                        )
                     }
                 }
             }
@@ -367,6 +367,33 @@ fun MovieDetailsScreen(
                 }
             }
         }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.BottomStart
+    ) {
+        FloatingChatButton(
+            onClick = {
+                runCatching {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/hanixurdu_support"))
+                    context.startActivity(intent)
+                }
+            }
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.BottomEnd
+    ) {
+        FloatingMindGamesPill(
+            onClick = { /* Home screen handles Mind Games state, navigation usually required or local state */ }
+        )
     }
 }
 
@@ -410,264 +437,332 @@ fun SeriesDetailsScreen(
         }
     }
 
-    Column(
+    var selectedTab by rememberSaveable { mutableStateOf("Episodes") }
+    var showWhatsAppFollow by rememberSaveable { mutableStateOf(true) }
+    val context = LocalContext.current
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(OledBlack)
             .testTag("series_details_screen")
     ) {
-        HaniXTopBar(
-            title = resolvedSeriesTitle,
-            subtitle = "Seasons & Episodes • Auto-Updated",
-            onBackClick = onBackClick,
-            onVipClick = onNavigateToVip
-        )
+        Column(modifier = Modifier.fillMaxSize()) {
+            HaniXTopBar(
+                title = resolvedSeriesTitle,
+                subtitle = "Seasons & Episodes • Auto-Updated",
+                onBackClick = onBackClick,
+                onVipClick = onNavigateToVip
+            )
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            if (seriesState !is RemoteDataState.Success) {
-                item {
-                    ContractStateBanner(
-                        state = seriesState,
-                        onRetry = { onLoadSeriesAndSeasons(seriesId) },
-                        onOpenChecklist = onOpenChecklist
-                    )
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (seriesState !is RemoteDataState.Success) {
+                    item {
+                        ContractStateBanner(
+                            state = seriesState,
+                            onRetry = { onLoadSeriesAndSeasons(seriesId) },
+                            onOpenChecklist = onOpenChecklist
+                        )
+                    }
                 }
-            }
 
-            if (seriesState is RemoteDataState.Success) {
-                val series = seriesState.data
-                item {
-                    VvipGlassCard(borderColor = CinemaCrimson.copy(alpha = 0.6f)) {
-                        Column {
-                            if (!series.resolvedPoster.isNullOrBlank()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(210.dp)
-                                ) {
-                                    AsyncImage(
-                                        model = series.resolvedPoster,
-                                        contentDescription = series.resolvedTitle,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
+                if (seriesState is RemoteDataState.Success) {
+                    val series = seriesState.data
+                    val firstEpId = (episodesState as? RemoteDataState.Success)
+                        ?.data
+                        ?.firstOrNull { isUserVip || !it.id.startsWith("vip_locked_") }
+                        ?.id
+                        ?.removePrefix("vip_locked_")
+                        ?: "1"
+
+                    item {
+                        VvipGlassCard(borderColor = CinemaCrimson.copy(alpha = 0.5f)) {
+                            Column {
+                                if (!series.resolvedPoster.isNullOrBlank()) {
                                     Box(
                                         modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    colors = listOf(
-                                                        Color.Transparent,
-                                                        OledBlack.copy(alpha = 0.94f)
+                                            .fillMaxWidth()
+                                            .height(230.dp)
+                                    ) {
+                                        AsyncImage(
+                                            model = series.resolvedPoster,
+                                            contentDescription = series.resolvedTitle,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(
+                                                    Brush.verticalGradient(
+                                                        colors = listOf(
+                                                            Color.Transparent,
+                                                            Color(0xFF0F1116).copy(alpha = 0.95f)
+                                                        )
                                                     )
                                                 )
-                                            )
-                                    )
-                                    Column(
-                                        modifier = Modifier
-                                            .align(Alignment.BottomStart)
-                                            .padding(16.dp)
-                                    ) {
-                                        Text(
-                                            text = series.category ?: "Urdu Historical & Drama Series",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = VipChampagneGold
-                                        )
-                                        Text(
-                                            text = series.resolvedTitle,
-                                            style = MaterialTheme.typography.headlineMedium,
-                                            color = Color.White,
-                                            fontWeight = FontWeight.ExtraBold
                                         )
                                     }
                                 }
-                            }
 
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                if (series.resolvedPoster.isNullOrBlank()) {
+                                Column(modifier = Modifier.padding(16.dp)) {
                                     Text(
                                         text = series.resolvedTitle,
                                         style = MaterialTheme.typography.headlineMedium,
-                                        color = TextPrimaryIvory,
+                                        color = Color.White,
                                         fontWeight = FontWeight.ExtraBold
                                     )
-                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "${if (seasonsState is RemoteDataState.Success) seasonsState.data.size else 1} Seasons • Trending • all • fan_dubbing • premium • 👑 VIP Series",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = VipChampagneGold
+                                    )
+
+                                    Spacer(modifier = Modifier.height(14.dp))
+
+                                    // Action buttons: 3D White Watch Now + Share
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Cinema3DButton(
+                                            text = "▶ Watch Now",
+                                            onClick = { onPlayEpisode(firstEpId) },
+                                            variant = Cinema3DButtonVariant.White,
+                                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                                            shape = RoundedCornerShape(10.dp),
+                                            testTag = "series_watch_now_button"
+                                        )
+
+                                        Box(
+                                            modifier = Modifier
+                                                .size(44.dp)
+                                                .shadow(4.dp, CircleShape)
+                                                .clip(CircleShape)
+                                                .background(Color(0xFF262934))
+                                                .border(1.dp, Color(0xFF404656), CircleShape)
+                                                .clickable {
+                                                    runCatching {
+                                                        val sendIntent = Intent().apply {
+                                                            action = Intent.ACTION_SEND
+                                                            putExtra(
+                                                                Intent.EXTRA_TEXT,
+                                                                "Watch ${series.resolvedTitle} on HaniX Urdu: https://hanixurdu.com/series.php?sub=${series.resolvedTitle}"
+                                                            )
+                                                            type = "text/plain"
+                                                        }
+                                                        context.startActivity(Intent.createChooser(sendIntent, "Share Series"))
+                                                    }
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Share,
+                                                contentDescription = "Share",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    Text(
+                                        text = "Historical   + More",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFAAAAAA)
+                                    )
                                 }
-                                Text(
-                                    text = series.description ?: "Watch all seasons and episodes of ${series.resolvedTitle} on HaniX Urdu.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = TextSecondarySilver
-                                )
                             }
                         }
                     }
-                }
-            }
 
-            // Season Selector Pills
-            if (seasonsState is RemoteDataState.Success && seasonsState.data.isNotEmpty()) {
-                item {
-                    Column {
-                        Text(
-                            text = "Select Season (${seasonsState.data.size} Available)",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = VipChampagneGold,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
+                    // Tabs: Episodes, Details, Related (matching website)
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(28.dp)
+                        ) {
+                            listOf("Episodes", "Details", "Related").forEach { tab ->
+                                val isSelected = selectedTab == tab
+                                Column(
+                                    modifier = Modifier
+                                        .clickable { selectedTab = tab }
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = tab,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = if (isSelected) Color.White else Color(0xFF7A7E8C),
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .width(if (isSelected) 36.dp else 0.dp)
+                                            .height(3.dp)
+                                            .background(if (isSelected) CinemaCrimson else Color.Transparent)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+            // Season Selector Pills & Episodes (when selectedTab == "Episodes")
+            if (selectedTab == "Episodes") {
+                if (seasonsState is RemoteDataState.Success && seasonsState.data.isNotEmpty()) {
+                    item {
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             items(seasonsState.data, key = { it.resolvedId }) { season ->
                                 val isSelected = activeSeasonId == season.resolvedId
-                                Button(
+                                Cinema3DButton(
+                                    text = season.resolvedSeasonName,
                                     onClick = {
                                         activeSeasonId = season.resolvedId
                                         onLoadSeasonEpisodes(season.resolvedId)
                                     },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isSelected) CinemaCrimson else CharcoalSurface,
-                                        contentColor = Color.White
-                                    ),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text(
-                                        text = season.resolvedSeasonName,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    variant = if (isSelected) Cinema3DButtonVariant.Crimson else Cinema3DButtonVariant.Dark,
+                                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    testTag = "season_button_${season.resolvedId}"
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Inline Episodes List
+                if (episodesState is RemoteDataState.Loading) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(color = CinemaCrimson, modifier = Modifier.size(26.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Loading Episodes...", color = TextSecondarySilver)
+                        }
+                    }
+                } else if (episodesState is RemoteDataState.Success && episodesState.data.isNotEmpty()) {
+                    items(episodesState.data, key = { "series_ep_${it.id}" }) { episode ->
+                        EpisodeCardItem(
+                            episode = episode,
+                            isUserVip = isUserVip,
+                            onPlayClick = {
+                                val cleanEpisodeId = episode.id.removePrefix("vip_locked_")
+                                if (episode.resolvedIsVip && !isUserVip && episode.id.startsWith("vip_locked_")) {
+                                    onNavigateToVip()
+                                } else {
+                                    onPlayEpisode(cleanEpisodeId)
+                                }
+                            },
+                            onUnlockVipClick = onNavigateToVip,
+                            onDownloadClick = {
+                                val cleanEpisodeId = episode.id.removePrefix("vip_locked_")
+                                onDownloadEpisode(cleanEpisodeId)
+                            }
+                        )
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Cinema3DButton(
+                        text = "← Back to Home",
+                        onClick = onBackClick,
+                        variant = Cinema3DButtonVariant.Crimson,
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 13.dp),
+                        modifier = Modifier.testTag("back_to_home_button")
+                    )
+                }
+
+                // About HaniX Urdu & Auditions (matching screenshot)
+                item {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 70.dp)
+                    ) {
+                        Text(
+                            text = "About HaniX Urdu & Auditions",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = CinemaCrimson,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "HaniX Urdu is your ultimate Entertainment Hub, bringing you the best in trending web series, movies, and exclusive originals. Stream your favorite Turkish series on our YouTube channel with crisp Urdu voiceovers, or join our community of passionate creators and fans collaborate to bring top-tier Anime and Drama to life.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextPrimaryIvory,
+                            lineHeight = 20.sp
+                        )
+                    }
+                }
+            } else if (selectedTab == "Details") {
+                item {
+                    if (seriesState is RemoteDataState.Success) {
+                        val series = seriesState.data
+                        VvipGlassCard(borderColor = GlassBorderSubtle) {
+                            Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(
+                                    text = series.resolvedTitle,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = TextPrimaryIvory,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = series.category ?: "Premium Urdu dubbed high-definition drama stream.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = TextSecondarySilver
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Surface(color = CharcoalSurface, shape = RoundedCornerShape(4.dp)) {
+                                        Text("Urdu Dubbed", color = EmeraldVerified, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(6.dp, 3.dp))
+                                    }
+                                    Surface(color = CharcoalSurface, shape = RoundedCornerShape(4.dp)) {
+                                        Text("Full HD 1080p", color = VipChampagneGold, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(6.dp, 3.dp))
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-
-            // Inline Episodes List for the selected Season
-            if (episodesState is RemoteDataState.Loading) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(color = CinemaCrimson, modifier = Modifier.size(26.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Loading Season Episodes...", color = TextSecondarySilver)
-                    }
-                }
-            } else if (episodesState is RemoteDataState.Success && episodesState.data.isNotEmpty()) {
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Episodes (${episodesState.data.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimaryIvory,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (currentUser != null) {
-                            Surface(
-                                color = if (isUserVip) VipChampagneGold.copy(alpha = 0.2f) else CharcoalSurface,
-                                shape = RoundedCornerShape(50),
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (isUserVip) VipChampagneGold else EmeraldVerified
-                                )
+            } else if (selectedTab == "Related") {
+                if (seasonsState is RemoteDataState.Success && seasonsState.data.isNotEmpty()) {
+                    items(seasonsState.data, key = { "season_row_${it.resolvedId}" }) { season ->
+                        VvipGlassCard(
+                            onClick = { onSelectSeason(season.resolvedId) },
+                            borderColor = VipChampagneGold.copy(alpha = 0.4f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = if (isUserVip) {
-                                        "${currentUser.name} • 👑 VIP Unlocked"
-                                    } else {
-                                        "${currentUser.name} • FREE"
-                                    },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isUserVip) VipGoldLight else EmeraldVerified,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    text = season.resolvedSeasonName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = TextPrimaryIvory
+                                )
+                                Text(
+                                    text = "Open Full Episode List →",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = VipChampagneGold
                                 )
                             }
-                        }
-                    }
-                }
-                items(episodesState.data, key = { "series_ep_${it.id}" }) { episode ->
-                    EpisodeCardItem(
-                        episode = episode,
-                        isUserVip = isUserVip,
-                        onPlayClick = {
-                            val cleanEpisodeId = episode.id.removePrefix("vip_locked_")
-                            if (episode.resolvedIsVip && !isUserVip && episode.id.startsWith("vip_locked_")) {
-                                onNavigateToVip()
-                            } else {
-                                onPlayEpisode(cleanEpisodeId)
-                            }
-                        },
-                        onUnlockVipClick = onNavigateToVip,
-                        onDownloadClick = {
-                            val cleanEpisodeId = episode.id.removePrefix("vip_locked_")
-                            onDownloadEpisode(cleanEpisodeId)
-                        }
-                    )
-                }
-            }
-
-            item {
-                VvipGlassCard(borderColor = GlassBorderSubtle) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Text(
-                            text = "Dedicated Season & Episode Screens",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = VipChampagneGold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(
-                            onClick = { onOpenSeasonSelection(seriesId) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = VipChampagneGold,
-                                contentColor = OledBlack
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .testTag("open_season_selection_button")
-                        ) {
-                            Icon(Icons.Default.FolderSpecial, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Open Season Selection Screen", fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-            }
-
-            if (seasonsState is RemoteDataState.Success && seasonsState.data.isNotEmpty()) {
-                items(seasonsState.data, key = { "season_row_${it.resolvedId}" }) { season ->
-                    VvipGlassCard(
-                        onClick = { onSelectSeason(season.resolvedId) },
-                        borderColor = VipChampagneGold.copy(alpha = 0.4f)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = season.resolvedSeasonName,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = TextPrimaryIvory
-                            )
-                            Text(
-                                text = "Open Full Episode List →",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = VipChampagneGold
-                            )
                         }
                     }
                 }
@@ -675,6 +770,44 @@ fun SeriesDetailsScreen(
         }
     }
 }
+
+        // Floating WhatsApp Follow Pill & Chat button over the screen
+        if (showWhatsAppFollow) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 80.dp)
+            ) {
+                WhatsAppFollowPill(
+                    onFollowClick = {
+                        runCatching {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://whatsapp.com/channel/0029Va9Wk684Spk9jV5JzQ0y"))
+                            context.startActivity(intent)
+                        }
+                    },
+                    onDismissClick = { showWhatsAppFollow = false }
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 16.dp, bottom = 16.dp)
+        ) {
+            FloatingChatButton(
+                onClick = {
+                    runCatching {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/hanixurdu_support"))
+                        context.startActivity(intent)
+                    }
+                }
+            )
+        }
+    }
+}
+
+
 
 @Composable
 private fun EpisodeCardItem(
@@ -686,25 +819,31 @@ private fun EpisodeCardItem(
 ) {
     val isVip = episode.resolvedIsVip
     val isLocked = (isVip && !isUserVip) || (episode.id.startsWith("vip_locked_") && !isUserVip)
-    VvipGlassCard(
-        onClick = {
-            if (isLocked) onUnlockVipClick() else onPlayClick()
-        },
-        borderColor = if (isVip) VipChampagneGold.copy(alpha = 0.65f) else GlassBorderSubtle
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                if (isLocked) onUnlockVipClick() else onPlayClick()
+            }
+            .testTag("episode_card_${episode.id}"),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF131620)),
+        border = BorderStroke(1.dp, Color(0xFF222634))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            // Thumbnail with subtle rounded border
             Box(
                 modifier = Modifier
-                    .width(124.dp)
+                    .width(118.dp)
                     .aspectRatio(16f / 9f)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(CharcoalSurface),
+                    .background(Color(0xFF1C202C)),
                 contentAlignment = Alignment.Center
             ) {
                 if (!episode.resolvedPoster.isNullOrBlank()) {
@@ -714,110 +853,68 @@ private fun EpisodeCardItem(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(if (isVip) VipChampagneGold.copy(alpha = 0.92f) else CinemaCrimson.copy(alpha = 0.9f)),
-                    contentAlignment = Alignment.Center
-                ) {
+                } else {
                     Icon(
-                        imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.PlayArrow,
+                        imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
-                        tint = if (isVip) OledBlack else Color.White,
-                        modifier = Modifier.size(20.dp)
+                        tint = Color(0xFF555C70),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                if (isLocked) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "VIP Locked",
+                            tint = VipChampagneGold,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
+            // Episode title in center
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = episode.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (isVip) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (isUserVip) "👑 VIP Unlocked" else "🔒 VIP Only",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (isUserVip) EmeraldVerified else VipChampagneGold,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
 
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = episode.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = TextPrimaryIvory,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Surface(
-                        color = if (isVip) VipChampagneGold else CharcoalSurface,
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = when {
-                                isVip && isUserVip -> "👑 VIP UNLOCKED"
-                                isVip -> "👑 VIP"
-                                else -> "FREE"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isVip) OledBlack else EmeraldVerified,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-
-                if (!episode.description.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = episode.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondarySilver,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
-                        onClick = {
-                            if (isLocked) onUnlockVipClick() else onPlayClick()
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isLocked) VipChampagneGold else CinemaCrimson,
-                            contentColor = if (isLocked) OledBlack else Color.White
-                        ),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.height(34.dp)
-                    ) {
-                        Text(
-                            text = if (isLocked) "🔒 Unlock VIP" else "▶ Watch Episode",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    if (onDownloadClick != null && !isLocked) {
-                        OutlinedButton(
-                            onClick = onDownloadClick,
-                            border = BorderStroke(1.dp, VipChampagneGold),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.height(34.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Download,
-                                contentDescription = "Save to App Vault",
-                                tint = VipChampagneGold,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Vault",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = VipGoldLight
-                            )
-                        }
-                    }
-                }
+            // Circular Play Button on the right (matching screenshot)
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .shadow(3.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(Color(0xFF272C3B))
+                    .border(1.dp, Color(0xFF3D445A), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.PlayArrow,
+                    contentDescription = "Play",
+                    tint = if (isLocked) VipChampagneGold else Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
             }
         }
     }
@@ -892,15 +989,13 @@ fun SeasonSelectionScreen(
                                     color = TextMutedSlate
                                 )
                             }
-                            Button(
+                            Cinema3DButton(
+                                text = "Episodes",
                                 onClick = { onSeasonSelected(season.resolvedId) },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = CinemaCrimson,
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Text("Episodes", fontWeight = FontWeight.Bold)
-                            }
+                                variant = Cinema3DButtonVariant.Crimson,
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp),
+                                shape = RoundedCornerShape(8.dp)
+                            )
                         }
                     }
                 }
@@ -921,19 +1016,17 @@ fun SeasonSelectionScreen(
                             color = TextSecondarySilver
                         )
                         Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedButton(
+                        Cinema3DButton(
+                            text = "Open Episode List (Season #1)",
                             onClick = {
                                 val firstId = (seasonsState as? RemoteDataState.Success)?.data?.firstOrNull()?.resolvedId
                                     ?: "$seriesId||Season 1"
                                 onSeasonSelected(firstId)
                             },
-                            border = BorderStroke(1.dp, VipChampagneGold),
+                            variant = Cinema3DButtonVariant.Gold,
+                            icon = { Icon(Icons.Default.VideoLibrary, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp)) },
                             modifier = Modifier.testTag("inspect_episode_list_button")
-                        ) {
-                            Icon(Icons.Default.VideoLibrary, contentDescription = null, tint = VipChampagneGold, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Open Episode List (Season #1)", color = VipGoldLight)
-                        }
+                        )
                     }
                 }
             }
@@ -1022,26 +1115,21 @@ fun EpisodeListScreen(
                             color = TextSecondarySilver
                         )
                         Spacer(modifier = Modifier.height(10.dp))
-                        Button(
-                            onClick = {
-                                val firstEpId = (episodesState as? RemoteDataState.Success)
-                                    ?.data
-                                    ?.firstOrNull { isUserVip || !it.id.startsWith("vip_locked_") }
-                                    ?.id
-                                    ?.removePrefix("vip_locked_")
-                                    ?: "1"
-                                onPlayEpisode(firstEpId)
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = VipChampagneGold,
-                                contentColor = OledBlack
-                            ),
-                            modifier = Modifier.testTag("episode_authorize_playback_button")
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Open MovieBox Video Player", fontWeight = FontWeight.Bold)
-                        }
+                    Cinema3DButton(
+                        text = "Open MovieBox Video Player",
+                        onClick = {
+                            val firstEpId = (episodesState as? RemoteDataState.Success)
+                                ?.data
+                                ?.firstOrNull { isUserVip || !it.id.startsWith("vip_locked_") }
+                                ?.id
+                                ?.removePrefix("vip_locked_")
+                                ?: "1"
+                            onPlayEpisode(firstEpId)
+                        },
+                        variant = Cinema3DButtonVariant.Crimson,
+                        icon = { Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White) },
+                        modifier = Modifier.testTag("episode_authorize_playback_button")
+                    )
                     }
                 }
             }
@@ -1271,21 +1359,41 @@ fun VideoPlayerScreen(
         if (bunnyState is BunnyPlaybackState.ReadyToPlay &&
             (bunnyState as BunnyPlaybackState.ReadyToPlay).playbackType in listOf("webpage", "embed")) {
             isWebPlaying = !isWebPlaying
-            activeWebViewRef?.evaluateJavascript(
-                "(function(){ var v = document.querySelector('video'); if(v){ if(v.paused) v.play(); else v.pause(); } })();",
-                null
-            )
+            val jsCmd = if (isWebPlaying) {
+                """
+                (function() {
+                    var v = document.querySelector('video');
+                    if (v) {
+                        v.play().catch(function() {
+                            v.muted = true;
+                            v.play().then(function() {
+                                setTimeout(function() { v.muted = false; }, 300);
+                            });
+                        });
+                    }
+                    var b = document.querySelector('.vjs-big-play-button') || document.querySelector('#play-btn');
+                    if (b) try { b.click(); } catch(e) {}
+                })();
+                """.trimIndent()
+            } else {
+                "(function(){ var v = document.querySelector('video'); if(v) v.pause(); })();"
+            }
+            activeWebViewRef?.evaluateJavascript(jsCmd, null)
         } else {
             playerManager.togglePlayPause()
         }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(OledBlack)
             .testTag("video_player_screen")
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(OledBlack)
+        ) {
         if (!isFullscreen) {
             HaniXTopBar(
                 title = "HaniX Cinema Player",
@@ -1373,7 +1481,45 @@ fun VideoPlayerScreen(
                                                     } catch(e) {}
                                                 })();
                                             """.trimIndent()
+                                            val autoPlayScript = """
+                                                (function() {
+                                                    var attempts = 0;
+                                                    function triggerAutoPlayback() {
+                                                        try {
+                                                            var covers = document.querySelectorAll('.vjs-poster, #poster, .art-player-cover, .plyr__poster, .video-poster, .poster-img');
+                                                            covers.forEach(function(c) { c.style.display = 'none'; });
+                                                            var vids = document.querySelectorAll('video');
+                                                            vids.forEach(function(v) {
+                                                                v.autoplay = true;
+                                                                v.muted = true;
+                                                                v.setAttribute('playsinline', 'true');
+                                                                var p = v.play();
+                                                                if (p !== undefined) {
+                                                                    p.then(function() {
+                                                                        setTimeout(function() { v.muted = false; }, 600);
+                                                                    }).catch(function() {
+                                                                        v.muted = true;
+                                                                        v.play();
+                                                                    });
+                                                                }
+                                                            });
+                                                            var playBtns = document.querySelectorAll('#play-btn, .play-btn, .vjs-big-play-button, .plyr__control--overlaid, .jw-display-icon-container, [aria-label="Play"], .art-icon-play');
+                                                            playBtns.forEach(function(b) {
+                                                                try { b.click(); } catch(e) {}
+                                                            });
+                                                        } catch(e) {}
+                                                    }
+                                                    var observer = new MutationObserver(function() { triggerAutoPlayback(); });
+                                                    observer.observe(document.body, { childList: true, subtree: true });
+                                                    triggerAutoPlayback();
+                                                    var itv = setInterval(function() {
+                                                        triggerAutoPlayback();
+                                                        if (attempts++ > 10) clearInterval(itv);
+                                                    }, 1500);
+                                                })();
+                                            """.trimIndent()
                                             view?.evaluateJavascript(isolatePlayerJs, null)
+                                            view?.evaluateJavascript(autoPlayScript, null)
                                             view?.evaluateJavascript(
                                                 HaniXSecurityShield.buildWebViewAudioAndLinkProtectionJs(),
                                                 null
@@ -1433,6 +1579,34 @@ fun VideoPlayerScreen(
                                                 HaniXSecurityShield.buildWebViewAudioAndLinkProtectionJs(),
                                                 null
                                             )
+                                            val autoPlayJs = """
+                                                (function() {
+                                                    function triggerPlayback() {
+                                                        var videos = document.getElementsByTagName('video');
+                                                        for (var i = 0; i < videos.length; i++) {
+                                                            var v = videos[i];
+                                                            v.autoplay = true;
+                                                            v.playsInline = true;
+                                                            var p = v.play();
+                                                            if (p !== undefined) {
+                                                                p.catch(function(e) {
+                                                                    v.muted = true;
+                                                                    v.play();
+                                                                });
+                                                            }
+                                                        }
+                                                        var playButtons = document.querySelectorAll('.vjs-big-play-button, #play-btn, .play-button, .jw-display-icon-container, button[aria-label="Play"], .plyr__control--overlaid');
+                                                        for (var j = 0; j < playButtons.length; j++) {
+                                                            try { playButtons[j].click(); } catch(e){}
+                                                        }
+                                                    }
+                                                    triggerPlayback();
+                                                    setTimeout(triggerPlayback, 400);
+                                                    setTimeout(triggerPlayback, 1200);
+                                                    setTimeout(triggerPlayback, 2500);
+                                                })();
+                                            """.trimIndent()
+                                            view?.evaluateJavascript(autoPlayJs, null)
                                         }
                                     }
                                     tag = streamUrl
@@ -1499,6 +1673,10 @@ fun VideoPlayerScreen(
                                 detectTapGestures(
                                     onTap = {
                                         showControlsOverlay = !showControlsOverlay
+                                        activeWebViewRef?.evaluateJavascript(
+                                            "(function(){ var v = document.querySelector('video'); if(v && v.paused){ v.play().catch(function(){ v.muted = true; v.play(); }); } var b = document.querySelector('.vjs-big-play-button') || document.querySelector('#play-btn'); if(b) b.click(); })();",
+                                            null
+                                        )
                                     },
                                     onDoubleTap = { offset ->
                                         if (!isScreenLocked) {
@@ -1988,16 +2166,12 @@ fun VideoPlayerScreen(
                             color = TextSecondarySilver
                         )
                         Spacer(modifier = Modifier.height(12.dp))
-                        Button(
+                        Cinema3DButton(
+                            text = "Upgrade via JazzCash & WhatsApp",
                             onClick = onNavigateToVip,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = VipChampagneGold,
-                                contentColor = OledBlack
-                            ),
+                            variant = Cinema3DButtonVariant.Gold,
                             modifier = Modifier.testTag("player_vip_required_button")
-                        ) {
-                            Text("Upgrade via JazzCash & WhatsApp", fontWeight = FontWeight.Bold)
-                        }
+                        )
                     }
                 }
 
@@ -2012,17 +2186,12 @@ fun VideoPlayerScreen(
                             color = AmberPending
                         )
                         Spacer(modifier = Modifier.height(10.dp))
-                        Button(
+                        Cinema3DButton(
+                            text = "Renew Stream Session",
                             onClick = { onAuthorizePlayback(contentType, contentId) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = VipChampagneGold,
-                                contentColor = OledBlack
-                            )
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Renew Stream Session", fontWeight = FontWeight.Bold)
-                        }
+                            variant = Cinema3DButtonVariant.Gold,
+                            icon = { Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Black) }
+                        )
                     }
                 }
 
@@ -2071,11 +2240,12 @@ fun VideoPlayerScreen(
                             color = CinemaCrimson
                         )
                         Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedButton(onClick = { onAuthorizePlayback(contentType, contentId) }) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, tint = VipChampagneGold)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Retry Stream", color = VipChampagneGold)
-                        }
+                        Cinema3DButton(
+                            text = "Retry Stream",
+                            onClick = { onAuthorizePlayback(contentType, contentId) },
+                            variant = Cinema3DButtonVariant.Crimson,
+                            icon = { Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White) }
+                        )
                     }
                 }
 
@@ -2088,224 +2258,166 @@ fun VideoPlayerScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 1. Drama Header & Compact Action Bar
+                // 1. Multi-Server Switching Row (3D Cinema Style)
+                item {
+                    val serverList = if (availableServers.isNotEmpty()) availableServers else listOf(
+                        PlaybackServerDto(id = "main", label = "Main Server", type = "webpage", url = "")
+                    )
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(serverList, key = { it.id }) { server ->
+                            val isSelected = selectedServerKey == server.id || (selectedServerKey.isBlank() && server.id == "main")
+                            Cinema3DButton(
+                                text = server.label,
+                                onClick = {
+                                    selectedServerKey = server.id
+                                    onSwitchServer(server)
+                                },
+                                variant = if (isSelected) Cinema3DButtonVariant.Crimson else Cinema3DButtonVariant.Dark,
+                                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                testTag = "server_switch_${server.id}"
+                            )
+                        }
+                    }
+                }
+
+                // 2. 3D Download via WhatsApp Button & Caption
+                item {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Cinema3DButton(
+                            text = "Download via WhatsApp",
+                            onClick = {
+                                runCatching {
+                                    val intent = Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("https://whatsapp.com/channel/0029Va9Wk684Spk9jV5JzQ0y")
+                                    )
+                                    context.startActivity(intent)
+                                }
+                                showDownloadDialog = true
+                            },
+                            variant = Cinema3DButtonVariant.Green,
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Default.ChatBubble,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            testTag = "player_whatsapp_download_button"
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "To download this video or episode, join our free WhatsApp Channel.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF9E9E9E)
+                        )
+                    }
+                }
+
+                // 3. Drama Title & Category
                 item {
                     val dramaTitle = episodesList.find { it.id == contentId }?.title
-                        ?: if (contentType.equals("series", ignoreCase = true)) "Drama Series" else "Drama #$contentId"
+                        ?: if (contentType.equals("series", ignoreCase = true)) "Episode 1" else "Drama #$contentId"
+                    Column {
+                        Text(
+                            text = dramaTitle,
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Historical",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF888888)
+                        )
+                    }
+                }
 
-                    VvipGlassCard(
-                        borderColor = VipChampagneGold.copy(alpha = 0.5f),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("player_info_card")
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = dramaTitle,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = TextPrimaryIvory,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "Urdu Dubbed • 1080p Ultra HD • HaniX Official",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = TextMutedSlate
-                                    )
-                                }
+                // 4. Download Status Feedback
+                if (downloadActionState is RemoteDataState.Success) {
+                    item {
+                        Surface(
+                            color = EmeraldVerified.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, EmeraldVerified.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "✓ Saved in App-Private Offline Vault (${downloadActionState.data.title}) — Hidden from Gallery.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = EmeraldVerified,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                } else if (downloadActionState is RemoteDataState.Error) {
+                    item {
+                        Text(
+                            text = downloadActionState.message,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AmberPending
+                        )
+                    }
+                }
 
-                                Surface(
-                                    color = if (payload?.requiresVip == true) VipChampagneGold.copy(alpha = 0.18f) else EmeraldVerified.copy(alpha = 0.18f),
-                                    shape = RoundedCornerShape(50),
-                                    border = BorderStroke(1.dp, if (payload?.requiresVip == true) VipChampagneGold else EmeraldVerified)
-                                ) {
-                                    Text(
-                                        text = if (payload?.requiresVip == true) "VIP ONLY" else "FREE HD",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (payload?.requiresVip == true) VipGoldLight else EmeraldVerified,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
+                // 5. Section Header: | MORE VIDEOS & RECOMMENDED FOR YOU
+                item {
+                    Column {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(4.dp)
+                                    .height(20.dp)
+                                    .background(CinemaCrimson)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "MORE VIDEOS & RECOMMENDED FOR YOU",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
 
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            // Sleek Action Buttons Row: [Download HD], [Episodes], [WhatsApp Support], [VIP Plans]
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Button(
-                                    onClick = { showDownloadDialog = true },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = CinemaCrimson,
-                                        contentColor = Color.White
-                                    ),
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                                    modifier = Modifier
-                                        .weight(1.2f)
-                                        .testTag("player_private_vault_download_button")
-                                ) {
-                                    Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Download", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                                }
-
-                                if (episodesList.isNotEmpty()) {
-                                    OutlinedButton(
-                                        onClick = { showEpisodeDrawer = true },
-                                        border = BorderStroke(1.dp, GlassBorderSubtle),
-                                        shape = RoundedCornerShape(10.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Icon(Icons.Default.VideoLibrary, contentDescription = null, tint = TextPrimaryIvory, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Episodes", color = TextPrimaryIvory, style = MaterialTheme.typography.labelMedium)
-                                    }
-                                }
-
-                                OutlinedButton(
+                // 6. Recommended Dramas Rail
+                if (recommendedMovies.isNotEmpty()) {
+                    item {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            items(recommendedMovies, key = { "rec_${it.resolvedId}" }) { recMovie ->
+                                MoviePosterCard(
+                                    movie = recMovie,
                                     onClick = {
-                                        runCatching {
-                                            val intent = Intent(
-                                                Intent.ACTION_VIEW,
-                                                Uri.parse("https://wa.me/923160450074?text=Assalam-o-Alaikum%20HaniX%20Urdu%2C%20I%20need%20help%20with%20$contentType%20%23$contentId")
-                                            )
-                                            context.startActivity(intent)
+                                        if (!recMovie.seriesName.isNullOrBlank()) {
+                                            onSelectRecommendedSeries(recMovie.seriesName)
+                                        } else {
+                                            onSelectRecommendedMovie(recMovie.resolvedId)
                                         }
                                     },
-                                    border = BorderStroke(1.dp, EmeraldVerified.copy(alpha = 0.7f)),
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
-                                    modifier = Modifier.testTag("player_whatsapp_download_button")
-                                ) {
-                                    Icon(Icons.Default.SupportAgent, contentDescription = "WhatsApp", tint = EmeraldVerified, modifier = Modifier.size(16.dp))
-                                }
-
-                                OutlinedButton(
-                                    onClick = onNavigateToVip,
-                                    border = BorderStroke(1.dp, VipChampagneGold.copy(alpha = 0.7f)),
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
-                                ) {
-                                    Icon(Icons.Default.WorkspacePremium, contentDescription = "VIP", tint = VipChampagneGold, modifier = Modifier.size(16.dp))
-                                }
-                            }
-
-                            if (downloadActionState is RemoteDataState.Success) {
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Surface(
-                                    color = EmeraldVerified.copy(alpha = 0.12f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(1.dp, EmeraldVerified.copy(alpha = 0.4f)),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = "✓ Saved in App-Private Offline Vault (${downloadActionState.data.title}) — Hidden from Gallery.",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = EmeraldVerified,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                    )
-                                }
-                            } else if (downloadActionState is RemoteDataState.Error) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = downloadActionState.message,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = AmberPending
+                                    modifier = Modifier.width(148.dp)
                                 )
                             }
                         }
                     }
                 }
 
-                // 2. Multi-Server Switching Row (Main Server / Server 2 / Direct Web Player)
-                if (availableServers.isNotEmpty()) {
-                    item {
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.CloudQueue,
-                                        contentDescription = null,
-                                        tint = VipChampagneGold,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Select Server",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = VipChampagneGold,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                Text(
-                                    text = "Auto-connected to HD Web Stream",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = TextMutedSlate
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                items(availableServers, key = { it.id }) { server ->
-                                    val isSelected = selectedServerKey == server.id
-                                    FilterChip(
-                                        selected = isSelected,
-                                        onClick = {
-                                            selectedServerKey = server.id
-                                            onSwitchServer(server)
-                                        },
-                                        label = {
-                                            Text(
-                                                text = server.label,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                style = MaterialTheme.typography.labelMedium
-                                            )
-                                        },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = CinemaCrimson,
-                                            selectedLabelColor = Color.White,
-                                            containerColor = CharcoalSurface,
-                                            labelColor = TextPrimaryIvory
-                                        ),
-                                        border = FilterChipDefaults.filterChipBorder(
-                                            enabled = true,
-                                            selected = isSelected,
-                                            borderColor = if (isSelected) VipChampagneGold else GlassBorderSubtle
-                                        ),
-                                        modifier = Modifier.testTag("server_switch_${server.id}")
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 3. Episodes Rail (if series/episodes are available)
+                // 7. Episodes Rail (if available)
                 if (episodesList.isNotEmpty()) {
                     item {
                         Column {
@@ -2360,34 +2472,6 @@ fun VideoPlayerScreen(
                     }
                 }
 
-                // 5. Recommended Dramas Rail
-                if (recommendedMovies.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "Recommended Dramas",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = VipChampagneGold,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            items(recommendedMovies, key = { "rec_${it.resolvedId}" }) { recMovie ->
-                                MoviePosterCard(
-                                    movie = recMovie,
-                                    onClick = {
-                                        if (!recMovie.seriesName.isNullOrBlank()) {
-                                            onSelectRecommendedSeries(recMovie.seriesName)
-                                        } else {
-                                            onSelectRecommendedMovie(recMovie.resolvedId)
-                                        }
-                                    },
-                                    modifier = Modifier.width(148.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
                 if (playbackAuthState is RemoteDataState.Error) {
                     item {
                         VvipGlassCard(
@@ -2405,22 +2489,21 @@ fun VideoPlayerScreen(
                                     textAlign = TextAlign.Center
                                 )
                                 Spacer(modifier = Modifier.height(10.dp))
-                                Button(
+                                Cinema3DButton(
+                                    text = "Retry Playback",
                                     onClick = { onAuthorizePlayback(contentType, contentId) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = CinemaCrimson)
-                                ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Retry Playback", fontWeight = FontWeight.Bold)
-                                }
+                                    variant = Cinema3DButtonVariant.Crimson,
+                                    icon = { Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White) }
+                                )
                             }
                         }
                     }
                 }
             }
         }
+    }
 
-        // Sleek Offline Download Quality Selection Dialog (1080p, 720p, 360p)
+    // Sleek Offline Download Quality Selection Dialog (1080p, 720p, 360p)
         if (showDownloadDialog) {
             Dialog(onDismissRequest = { showDownloadDialog = false }) {
                 VvipGlassCard(
@@ -2524,31 +2607,45 @@ fun VideoPlayerScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        Button(
+                        Cinema3DButton(
+                            text = "Download ($selectedQualityTier)",
                             onClick = {
                                 showDownloadDialog = false
                                 onDownloadCurrentMedia(contentType, contentId, selectedQualityTier)
                             },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = CinemaCrimson,
-                                contentColor = Color.White
-                            ),
-                            shape = RoundedCornerShape(10.dp),
+                            variant = Cinema3DButtonVariant.Crimson,
+                            icon = { Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp)
-                                .testTag("confirm_download_button")
-                        ) {
-                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Download ($selectedQualityTier)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                        }
+                                .testTag("confirm_download_button"),
+                            shape = RoundedCornerShape(10.dp)
+                        )
                     }
                 }
             }
         }
+
+        if (!isFullscreen) {
+            FloatingChatButton(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = 24.dp),
+                onClick = {
+                    runCatching {
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://wa.me/923160450074?text=Assalam-o-Alaikum%20HaniX%20Urdu%20Support")
+                        )
+                        context.startActivity(intent)
+                    }
+                }
+            )
     }
 }
+}
+
+
 
 private fun formatDurationMs(ms: Long): String {
     val totalSeconds = (ms / 1000L).coerceAtLeast(0L)

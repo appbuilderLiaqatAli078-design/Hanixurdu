@@ -103,7 +103,11 @@ import com.example.data.model.RemoteDataState
 import com.example.data.model.SearchPayload
 import com.example.data.model.Series
 import com.example.data.model.User
+import com.example.ui.components.Cinema3DButton
+import com.example.ui.components.Cinema3DButtonVariant
 import com.example.ui.components.ContractStateBanner
+import com.example.ui.components.FloatingChatButton
+import com.example.ui.components.FloatingMindGamesPill
 import com.example.ui.components.HaniXTopBar
 import com.example.ui.components.MoviePosterCard
 import com.example.ui.components.SecurityAssuranceStrip
@@ -267,14 +271,12 @@ fun HomeScreen(
                                     textAlign = TextAlign.Center
                                 )
                                 Spacer(modifier = Modifier.height(10.dp))
-                                Button(
+                                Cinema3DButton(
+                                    text = "Retry",
                                     onClick = onRefreshHome,
-                                    colors = ButtonDefaults.buttonColors(containerColor = CinemaCrimson)
-                                ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Retry", fontWeight = FontWeight.Bold)
-                                }
+                                    variant = Cinema3DButtonVariant.Crimson,
+                                    icon = { Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White) }
+                                )
                             }
                         }
                     }
@@ -407,12 +409,17 @@ fun HomeScreen(
                 if (homeState is RemoteDataState.Success) {
                     val payload = homeState.data
 
-                    // Section 1: Urdu Subtitles
-                    if (!payload.urduSubtitles.isNullOrEmpty()) {
+                    // Section 1: Urdu Subtitles (guaranteed fallback to popular Urdu dramas)
+                    val urduItems = if (!payload.urduSubtitles.isNullOrEmpty()) {
+                        payload.urduSubtitles
+                    } else {
+                        payload.allContent?.take(6) ?: payload.latestMovies?.take(6).orEmpty()
+                    }
+                    if (urduItems.isNotEmpty()) {
                         item {
                             WebsiteCategoryRail(
                                 title = "Urdu Subtitles",
-                                items = payload.urduSubtitles,
+                                items = urduItems,
                                 isLandscape = true,
                                 keyPrefix = "urdu",
                                 onActionClick = onNavigateToSeries,
@@ -558,20 +565,13 @@ fun HomeScreen(
                                 textAlign = TextAlign.Center
                             )
                             Spacer(modifier = Modifier.height(14.dp))
-                            Button(
+                            Cinema3DButton(
+                                text = "View Updates →",
                                 onClick = onNavigateToProfile,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFE50914),
-                                    contentColor = Color.White
-                                ),
-                                shape = RoundedCornerShape(30.dp)
-                            ) {
-                                Text(
-                                    text = "View Updates →",
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
-                                )
-                            }
+                                variant = Cinema3DButtonVariant.Crimson,
+                                shape = RoundedCornerShape(30.dp),
+                                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 10.dp)
+                            )
                         }
                     }
                 }
@@ -588,37 +588,39 @@ fun HomeScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            OutlinedButton(
+                            Cinema3DButton(
+                                text = "API Checklist",
                                 onClick = onNavigateToAbout,
-                                border = BorderStroke(1.dp, VipChampagneGold.copy(alpha = 0.6f)),
+                                variant = Cinema3DButtonVariant.Gold,
+                                icon = { Icon(Icons.Default.Info, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp)) },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .testTag("home_hero_checklist_button")
-                            ) {
-                                Icon(Icons.Default.Info, contentDescription = null, tint = VipChampagneGold, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("API Checklist", color = VipGoldLight, style = MaterialTheme.typography.labelSmall)
-                            }
+                                    .testTag("home_hero_checklist_button"),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(vertical = 10.dp)
+                            )
                             if (currentUser == null) {
-                                OutlinedButton(
+                                Cinema3DButton(
+                                    text = "Sign In / Register",
                                     onClick = onNavigateToLogin,
-                                    border = BorderStroke(1.dp, Color(0xFFFF0000)),
+                                    variant = Cinema3DButtonVariant.Crimson,
                                     modifier = Modifier
                                         .weight(1f)
-                                        .testTag("home_hero_login_button")
-                                ) {
-                                    Text("Sign In / Register", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                                }
+                                        .testTag("home_hero_login_button"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(vertical = 10.dp)
+                                )
                             } else {
-                                OutlinedButton(
+                                Cinema3DButton(
+                                    text = "Membership Status",
                                     onClick = onNavigateToVip,
-                                    border = BorderStroke(1.dp, VipChampagneGold),
+                                    variant = Cinema3DButtonVariant.Gold,
                                     modifier = Modifier
                                         .weight(1f)
-                                        .testTag("home_hero_vip_button")
-                                ) {
-                                    Text("Membership Status", color = VipChampagneGold, style = MaterialTheme.typography.labelSmall)
-                                }
+                                        .testTag("home_hero_vip_button"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(vertical = 10.dp)
+                                )
                             }
                         }
                         SecurityAssuranceStrip()
@@ -627,38 +629,27 @@ fun HomeScreen(
             }
         }
 
-        // Floating `🧠 Mind Games` Gradient Pill Button (matching `.mind-game-btn` in `header.php`)
-        Surface(
+        // Floating Red 3D Chat Support Button (matching hanixurdu.com bottom-left)
+        val context = LocalContext.current
+        FloatingChatButton(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 16.dp)
-                .clip(RoundedCornerShape(50))
-                .clickable { showMindGameModal = true }
-                .testTag("floating_mind_games_button"),
-            color = Color.Transparent,
-            shape = RoundedCornerShape(50),
-            border = BorderStroke(2.dp, Color.White.copy(alpha = 0.4f)),
-            shadowElevation = 10.dp
-        ) {
-            Box(
-                modifier = Modifier
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(Color(0xFFFF0055), Color(0xFFFF9900))
-                        )
-                    )
-                    .padding(horizontal = 18.dp, vertical = 11.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = "🧠 Mind Games",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White,
-                        fontWeight = FontWeight.ExtraBold
-                    )
+                .align(Alignment.BottomStart)
+                .padding(start = 16.dp, bottom = 16.dp),
+            onClick = {
+                runCatching {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/hanixurdu_support"))
+                    context.startActivity(intent)
                 }
             }
-        }
+        )
+
+        // Floating 3D Glossy Mind Games Pill Button (matching hanixurdu.com bottom-right)
+        FloatingMindGamesPill(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 16.dp),
+            onClick = { showMindGameModal = true }
+        )
     }
 
     // Interactive Mind Games Quiz Modal (`mind_game.php`)
@@ -1075,82 +1066,50 @@ private fun HaniXHeroCoverflowSection(
                 )
             }
 
-            // 3 Centered Action Buttons (`▶ Watch Now`, `+`, `👑 Join VIP`) matching `.hero-actions-center` in `index.php`
+            // 3 Centered Action Buttons (`▶ Watch Now`, `+`, `👑 VIP Active` / `👑 Join VIP`) matching `.hero-actions-center` in `index.php`
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
-                // 1. `▶ Watch Now` (White pill button with black bold text)
-                Button(
+                // 1. `▶ Watch Now` (3D glossy white cinema button)
+                Cinema3DButton(
+                    text = "▶ Watch Now",
                     onClick = { onWatchBanner(activeBanner) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black
-                    ),
-                    shape = RoundedCornerShape(6.dp),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
-                    modifier = Modifier.testTag("coverflow_watch_now_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = Color.Black,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Watch Now",
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.Black
-                    )
-                }
+                    variant = Cinema3DButtonVariant.White,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 11.dp),
+                    testTag = "coverflow_watch_now_button"
+                )
 
                 // 2. `+` (Dark translucent square glass button)
-                Surface(
-                    color = Color.White.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(6.dp),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
+                Box(
                     modifier = Modifier
                         .size(42.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF222634))
+                        .border(1.dp, Color(0xFF3B4256), RoundedCornerShape(8.dp))
                         .clickable(onClick = onAddToMyList)
-                        .testTag("coverflow_add_list_button")
+                        .testTag("coverflow_add_list_button"),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = if (addedToListFeedback) Icons.Default.Check else Icons.Default.Add,
-                            contentDescription = "Add to My List",
-                            tint = if (addedToListFeedback) EmeraldVerified else Color.White
-                        )
-                    }
+                    Icon(
+                        imageVector = if (addedToListFeedback) Icons.Default.Check else Icons.Default.Add,
+                        contentDescription = "Add to My List",
+                        tint = if (addedToListFeedback) EmeraldVerified else Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
 
-                // 3. `👑 Join VIP` (Gold gradient button `#FFD700 -> #FFAA00` with black bold text)
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable(onClick = onOpenVipModal)
-                        .testTag("coverflow_join_vip_button")
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(Color(0xFFFFD700), Color(0xFFFFAA00))
-                                )
-                            )
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (isActiveVip) "👑 VIP Active" else "👑 Join VIP",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color.Black,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-                }
+                // 3. `👑 Join VIP` / `👑 VIP Active` (3D Gold / Green cinema button)
+                Cinema3DButton(
+                    text = if (isActiveVip) "👑 VIP Active" else "👑 Join VIP",
+                    onClick = onOpenVipModal,
+                    variant = if (isActiveVip) Cinema3DButtonVariant.Green else Cinema3DButtonVariant.Gold,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 11.dp),
+                    testTag = "coverflow_join_vip_button"
+                )
             }
         }
     }

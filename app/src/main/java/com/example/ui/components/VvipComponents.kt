@@ -58,11 +58,23 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -871,6 +883,246 @@ fun SecurityAssuranceStrip(modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.labelSmall,
                 color = TextSecondarySilver
             )
+        }
+    }
+}
+
+/**
+ * 3D Cinema Button Color Variants
+ */
+enum class Cinema3DButtonVariant {
+    Crimson,
+    Gold,
+    Green,
+    White,
+    Dark
+}
+
+/**
+ * Polished 3D Cinema Button with realistic top luminous highlight,
+ * vertical depth gradient, elevated drop shadow, and tactile feel.
+ * Replaces cartoon/flat buttons across all drama & player screens.
+ */
+@Composable
+fun Cinema3DButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    variant: Cinema3DButtonVariant = Cinema3DButtonVariant.Crimson,
+    shape: Shape = RoundedCornerShape(12.dp),
+    icon: (@Composable () -> Unit)? = null,
+    testTag: String = "cinema_3d_button",
+    contentPadding: PaddingValues = PaddingValues(horizontal = 20.dp, vertical = 11.dp),
+    enabled: Boolean = true
+) {
+    val (gradientColors, highlightColor, textColor) = when (variant) {
+        Cinema3DButtonVariant.Crimson -> Triple(
+            listOf(Color(0xFFFF3344), Color(0xFFDC143C), Color(0xFF8B0000)),
+            Color(0xFFFF858E),
+            Color.White
+        )
+        Cinema3DButtonVariant.Gold -> Triple(
+            listOf(Color(0xFFFFE066), Color(0xFFD4AF37), Color(0xFF8C6D1F)),
+            Color(0xFFFFF2B2),
+            Color(0xFF140D00)
+        )
+        Cinema3DButtonVariant.Green -> Triple(
+            listOf(Color(0xFF38E678), Color(0xFF25D366), Color(0xFF0F7A38)),
+            Color(0xFF9DF5BA),
+            Color.White
+        )
+        Cinema3DButtonVariant.White -> Triple(
+            listOf(Color(0xFFFFFFFF), Color(0xFFE8E8E8), Color(0xFFC4C4C4)),
+            Color(0xFFFFFFFF),
+            Color(0xFF111111)
+        )
+        Cinema3DButtonVariant.Dark -> Triple(
+            listOf(Color(0xFF323642), Color(0xFF22252F), Color(0xFF13151C)),
+            Color(0xFF555B6E),
+            Color.White
+        )
+    }
+
+    Box(
+        modifier = modifier
+            .shadow(elevation = 6.dp, shape = shape, spotColor = Color.Black.copy(alpha = 0.6f))
+            .clip(shape)
+            .background(Brush.verticalGradient(gradientColors))
+            .border(width = 1.dp, color = highlightColor.copy(alpha = 0.75f), shape = shape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(contentPadding)
+            .testTag(testTag),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (icon != null) {
+                icon()
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(
+                text = text,
+                color = textColor,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+/**
+ * Floating Circular Red 3D Chat Button matching hanixurdu.com (bottom-left).
+ */
+@Composable
+fun FloatingChatButton(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .size(54.dp)
+            .shadow(elevation = 8.dp, shape = CircleShape, spotColor = Color(0xFFDC143C))
+            .clip(CircleShape)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFFFF3B4B),
+                        Color(0xFFDC143C),
+                        Color(0xFF8B0000)
+                    )
+                )
+            )
+            .border(1.5.dp, Color(0xFFFF8A94), CircleShape)
+            .clickable(onClick = onClick)
+            .testTag("floating_chat_button"),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.ChatBubble,
+            contentDescription = "HaniX Chat Support",
+            tint = Color.White,
+            modifier = Modifier.size(24.dp)
+        )
+    }
+}
+
+/**
+ * Floating 3D Glossy Orange/Gold "Mind Games" Pill matching hanixurdu.com (bottom-right).
+ */
+@Composable
+fun FloatingMindGamesPill(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .shadow(elevation = 8.dp, shape = RoundedCornerShape(50), spotColor = Color(0xFFFF6600))
+            .clip(RoundedCornerShape(50))
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFFFF8533),
+                        Color(0xFFFF5500),
+                        Color(0xFFCC3700)
+                    )
+                )
+            )
+            .border(1.dp, Color(0xFFFFB380), RoundedCornerShape(50))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp)
+            .testTag("floating_mind_games_pill"),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "🧠",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "Mind Games",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold
+            )
+        }
+    }
+}
+
+/**
+ * Floating Green "Follow on WhatsApp" Pill matching hanixurdu.com
+ */
+@Composable
+fun WhatsAppFollowPill(
+    modifier: Modifier = Modifier,
+    onFollowClick: () -> Unit,
+    onDismissClick: (() -> Unit)? = null
+) {
+    Box(
+        modifier = modifier
+            .shadow(elevation = 8.dp, shape = RoundedCornerShape(50), spotColor = Color(0xFF25D366))
+            .clip(RoundedCornerShape(50))
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF263238),
+                        Color(0xFF1A2226),
+                        Color(0xFF101618)
+                    )
+                )
+            )
+            .border(1.dp, Color(0xFF25D366).copy(alpha = 0.7f), RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 7.dp)
+            .testTag("whatsapp_follow_pill")
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clickable(onClick = onFollowClick)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF25D366)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "💬",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+                Text(
+                    text = "Follow on WhatsApp",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Latest updates & episodes",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF9E9E9E)
+                )
+            }
+            if (onDismissClick != null) {
+                Spacer(modifier = Modifier.width(10.dp))
+                IconButton(
+                    onClick = onDismissClick,
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
         }
     }
 }
