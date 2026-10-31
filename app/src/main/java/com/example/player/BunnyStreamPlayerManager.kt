@@ -10,7 +10,10 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.example.data.model.PlaybackAuthorizationPayload
+import com.example.data.model.PlaybackServerDto
+import com.example.data.security.HaniXSecurityShield
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,22 +24,26 @@ sealed interface BunnyPlaybackState {
     data class ReadyToPlay(
         val sessionId: String,
         val authorizedHlsUrl: String,
-        val tokenExpiresAtEpochSeconds: Long?
+        val membershipRequired: String,
+        val tokenExpiresAtEpochSeconds: Long?,
+        val playbackType: String = "hls", // "hls", "direct", or "embed"
+        val selectedServerId: String = "main"
     ) : BunnyPlaybackState
     data class DeniedVipRequired(val reason: String) : BunnyPlaybackState
+    data class ExpiredPlaybackToken(val reason: String) : BunnyPlaybackState
     data class VideoProcessing(val status: String) : BunnyPlaybackState
     data class BackendPendingIntegration(val endpoint: String, val details: String) : BunnyPlaybackState
     data class PlaybackFailure(val message: String) : BunnyPlaybackState
 }
 
 /**
- * Bunny Stream HLS Adaptive Playback Manager built on AndroidX Media3 ExoPlayer.
+ * Multi-Source & Multi-Server Video Playback Manager (`run_video.php` + Bunny Stream).
  *
- * Security & Architecture Compliance (Sections 3, 5, 8, 10):
- * - Never embeds Bunny Stream API keys or library admin secrets inside the APK.
- * - Never invents a fake or hardcoded Bunny playback URL.
- * - Exclusively consumes short-lived signed HLS URLs returned by `POST /playback/authorize`
- *   on the Hostinger PHP backend after user authentication and VIP permission checks.
+ * Supports all 3 playback modes used across `run_video.php`:
+ * 1. Bunny Stream signed HLS adaptive streams (`playback_type = "hls"` / `.m3u8`) via Media3 ExoPlayer
+ * 2. Direct MP4/MKV streams (`video_path` with `playback_type = "direct"`) via Media3 ExoPlayer
+ * 3. Embedded Provider Streams (`video_link` / `server1_link` / `server2_link` for YouTube, Rumble,
+ *    Dailymotion, Google Drive `/preview`, or Server 2 iframe links with `playback_type = "embed"`)
  */
 class BunnyStreamPlayerManager(private val context: Context) {
 
@@ -54,6 +61,9 @@ class BunnyStreamPlayerManager(private val context: Context) {
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
+    private val _playbackSpeed = MutableStateFlow(1.0f)
+    val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
+
     fun setAuthorizing() {
         _playbackState.value = BunnyPlaybackState.AuthorizingWithBackend
     }
@@ -69,99 +79,216 @@ class BunnyStreamPlayerManager(private val context: Context) {
     }
 
     /**
-     * Validates the PHP backend's `PlaybackAuthorizationPayload` and prepares the HLS adaptive media source.
+     * Pure validation of backend playback authorization payload (`POST /playback/authorize`).
      */
-    @OptIn(UnstableApi::class)
-    fun initializeFromBackendAuthorization(payload: PlaybackAuthorizationPayload): ExoPlayer? {
-        if (payload.requiresVip && !payload.isAuthorized) {
-            releasePlayer()
-            _playbackState.value = BunnyPlaybackState.DeniedVipRequired(
-                "VIP Membership is required to stream this title. Entitlement check enforced by backend."
+    fun validateAuthorizationPayload(
+        payload: PlaybackAuthorizationPayload,
+        nowEpochSeconds: Long = System.currentTimeMillis() / 1000L
+    ): BunnyPlaybackState {
+        val isVipContent = payload.requiresVip || payload.membershipRequired.equals("VIP", ignoreCase = true)
+        val authorized = payload.resolvedIsAuthorized
+
+        if (isVipContent && !authorized) {
+            return BunnyPlaybackState.DeniedVipRequired(
+                "VIP Membership is required to watch this content. Your current membership is FREE or your VIP access has expired."
             )
-            return null
         }
 
-        if (!payload.isAuthorized) {
-            releasePlayer()
-            _playbackState.value = BunnyPlaybackState.PlaybackFailure(
-                "Playback authorization denied by backend for content ID ${payload.contentId}."
+        if (!authorized) {
+            return BunnyPlaybackState.PlaybackFailure(
+                "Playback authorization denied by backend for content ID ${payload.contentId.ifBlank { payload.contentIdSnake.orEmpty() }}."
             )
-            return null
         }
 
         if (!payload.processingStatus.equals("READY", ignoreCase = true)) {
-            releasePlayer()
-            _playbackState.value = BunnyPlaybackState.VideoProcessing(payload.processingStatus)
-            return null
+            return BunnyPlaybackState.VideoProcessing(payload.processingStatus)
         }
 
-        val hlsUrl = payload.authorizedHlsUrl?.trim()
-        if (hlsUrl.isNullOrBlank() || !hlsUrl.startsWith("https://", ignoreCase = true)) {
-            releasePlayer()
-            _playbackState.value = BunnyPlaybackState.PlaybackFailure(
-                "Backend did not return a valid HTTPS signed Bunny Stream HLS playlist (.m3u8)."
+        val expiryEpoch = payload.resolvedExpiryEpochSeconds
+        if (expiryEpoch != null && expiryEpoch <= nowEpochSeconds) {
+            return BunnyPlaybackState.ExpiredPlaybackToken(
+                "Short-lived playback authorization token has expired. Requesting fresh authorization is required."
             )
-            return null
         }
 
-        val nowEpochSeconds = System.currentTimeMillis() / 1000L
-        if (payload.tokenExpiresAtEpochSeconds != null && payload.tokenExpiresAtEpochSeconds <= nowEpochSeconds) {
-            releasePlayer()
-            _playbackState.value = BunnyPlaybackState.PlaybackFailure(
-                "Short-lived Bunny Stream playback token has already expired. Please re-authorize."
+        val streamUrl = payload.resolvedPlaybackUrl?.trim()
+        if (streamUrl.isNullOrBlank() || !streamUrl.startsWith("https://", ignoreCase = true)) {
+            return BunnyPlaybackState.PlaybackFailure(
+                "Backend did not return a valid HTTPS playback URL."
             )
+        }
+
+        val resolvedType = classifyUrlAndType(streamUrl, payload.playbackType)
+
+        return BunnyPlaybackState.ReadyToPlay(
+            sessionId = payload.playbackSessionId.ifBlank { "session_${payload.contentId.ifBlank { payload.contentIdSnake.orEmpty() }}" },
+            authorizedHlsUrl = streamUrl,
+            membershipRequired = if (isVipContent) "VIP" else "FREE",
+            tokenExpiresAtEpochSeconds = expiryEpoch,
+            playbackType = resolvedType,
+            selectedServerId = payload.selectedServer ?: "main"
+        )
+    }
+
+    private fun classifyUrlAndType(url: String, declaredType: String): String {
+        val lowerUrl = url.lowercase()
+        val lowerType = declaredType.lowercase()
+        if (lowerType == "webpage" || lowerUrl.contains("run_video.php")) {
+            return "webpage"
+        }
+        if (lowerType == "embed" ||
+            lowerUrl.contains("youtube.com/embed/") ||
+            lowerUrl.contains("youtu.be/") ||
+            lowerUrl.contains("rumble.com/embed/") ||
+            lowerUrl.contains("dailymotion.com/embed/") ||
+            lowerUrl.contains("player.vimeo.com/") ||
+            lowerUrl.contains("drive.google.com/") ||
+            lowerUrl.contains("/embed/") ||
+            lowerUrl.contains("embed")
+        ) {
+            return "embed"
+        }
+        if (lowerType == "hls" || lowerUrl.contains(".m3u8")) {
+            return "hls"
+        }
+        return lowerType.ifBlank { "direct" }
+    }
+
+    /**
+     * Validates the PHP backend's `PlaybackAuthorizationPayload` and prepares Media3 ExoPlayer (for `hls`/`direct`)
+     * or signals `ReadyToPlay(..., playbackType = "embed" | "webpage")` (for embedded YouTube/Drive/Rumble/Server 2/Web Player links).
+     */
+    @OptIn(UnstableApi::class)
+    fun initializeFromBackendAuthorization(
+        payload: PlaybackAuthorizationPayload,
+        nowEpochSeconds: Long = System.currentTimeMillis() / 1000L,
+        attachExoPlayer: Boolean = true
+    ): ExoPlayer? {
+        val validatedState = validateAuthorizationPayload(payload, nowEpochSeconds)
+        if (validatedState !is BunnyPlaybackState.ReadyToPlay) {
+            releasePlayer()
+            _playbackState.value = validatedState
             return null
         }
 
         releasePlayer()
+        _playbackState.value = validatedState
+
+        // If the selected server is an iframe embed or Direct Web Player,
+        // WebView handles rendering while ExoPlayer stays released.
+        if (!attachExoPlayer ||
+            validatedState.playbackType == "embed" ||
+            validatedState.playbackType == "webpage"
+        ) {
+            return null
+        }
 
         val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(false) // Enforce HTTPS-only redirects
-            .setUserAgent("HaniXUrdu-Android-HLS/1.0")
+            .setAllowCrossProtocolRedirects(true)
+            .setUserAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
 
         if (!payload.customHeaders.isNullOrEmpty()) {
             httpDataSourceFactory.setDefaultRequestProperties(payload.customHeaders)
         }
 
-        val hlsMediaSource = HlsMediaSource.Factory(httpDataSourceFactory)
-            .setAllowChunklessPreparation(true)
-            .createMediaSource(MediaItem.fromUri(Uri.parse(hlsUrl)))
-
-        val player = ExoPlayer.Builder(context).build().apply {
-            setMediaSource(hlsMediaSource)
-            prepare()
-            val resumeMs = payload.resumePositionMs ?: 0L
-            if (resumeMs > 0L) {
-                seekTo(resumeMs)
-            }
-            playWhenReady = true
-            addListener(object : Player.Listener {
-                override fun onIsPlayingChanged(isPlayingNow: Boolean) {
-                    _isPlaying.value = isPlayingNow
-                    _currentPositionMs.value = currentPosition.coerceAtLeast(0L)
-                    _durationMs.value = duration.coerceAtLeast(0L)
-                }
-
-                override fun onPlaybackStateChanged(state: Int) {
-                    _currentPositionMs.value = currentPosition.coerceAtLeast(0L)
-                    _durationMs.value = duration.coerceAtLeast(0L)
-                }
-
-                override fun onPlayerError(error: PlaybackException) {
-                    _playbackState.value = BunnyPlaybackState.PlaybackFailure(
-                        "Bunny HLS Stream Error (${error.errorCodeName}): ${error.localizedMessage ?: "Playback interrupted"}"
-                    )
-                }
-            })
+        val mediaItem = MediaItem.fromUri(Uri.parse(validatedState.authorizedHlsUrl))
+        val mediaSource = if (validatedState.playbackType == "hls") {
+            HlsMediaSource.Factory(httpDataSourceFactory)
+                .setAllowChunklessPreparation(true)
+                .createMediaSource(mediaItem)
+        } else {
+            DefaultMediaSourceFactory(httpDataSourceFactory)
+                .createMediaSource(mediaItem)
         }
 
+        HaniXSecurityShield.enforceAudioCaptureBlock(context)
+
+        val player = ExoPlayer.Builder(context)
+            .setAudioAttributes(HaniXSecurityShield.buildProtectedMedia3AudioAttributes(), true)
+            .build().apply {
+                setMediaSource(mediaSource)
+                setPlaybackSpeed(_playbackSpeed.value)
+                prepare()
+                val resumeMs = payload.resumePositionMs ?: 0L
+                if (resumeMs > 0L) {
+                    seekTo(resumeMs)
+                }
+                playWhenReady = true
+                addListener(object : Player.Listener {
+                    override fun onIsPlayingChanged(isPlayingNow: Boolean) {
+                        _isPlaying.value = isPlayingNow
+                        _currentPositionMs.value = currentPosition.coerceAtLeast(0L)
+                        _durationMs.value = duration.coerceAtLeast(0L)
+                    }
+
+                    override fun onPlaybackStateChanged(state: Int) {
+                        _currentPositionMs.value = currentPosition.coerceAtLeast(0L)
+                        _durationMs.value = duration.coerceAtLeast(0L)
+                    }
+
+                    override fun onPlayerError(error: PlaybackException) {
+                        // Automatically fall back to the WebView HTML5 / Embed player if ExoPlayer fails on a direct/redirected URL
+                        releasePlayer()
+                        _playbackState.value = validatedState.copy(playbackType = "embed")
+                    }
+                })
+            }
+
         exoPlayer = player
-        _playbackState.value = BunnyPlaybackState.ReadyToPlay(
-            sessionId = payload.playbackSessionId,
-            authorizedHlsUrl = hlsUrl,
-            tokenExpiresAtEpochSeconds = payload.tokenExpiresAtEpochSeconds
-        )
         return player
+    }
+
+    fun setPlaybackSpeed(speed: Float) {
+        val clamped = speed.coerceIn(0.25f, 2.5f)
+        _playbackSpeed.value = clamped
+        exoPlayer?.setPlaybackSpeed(clamped)
+    }
+
+    fun togglePlayPause() {
+        val player = exoPlayer ?: return
+        if (player.isPlaying) {
+            player.pause()
+        } else {
+            player.play()
+        }
+    }
+
+    fun seekByDeltaMs(deltaMs: Long) {
+        val player = exoPlayer ?: return
+        val dur = player.duration.takeIf { it > 0L } ?: Long.MAX_VALUE
+        val target = (player.currentPosition + deltaMs).coerceIn(0L, dur)
+        player.seekTo(target)
+        _currentPositionMs.value = target
+    }
+
+    fun seekToPositionMs(positionMs: Long) {
+        val player = exoPlayer ?: return
+        val dur = player.duration.takeIf { it > 0L } ?: Long.MAX_VALUE
+        val target = positionMs.coerceIn(0L, dur)
+        player.seekTo(target)
+        _currentPositionMs.value = target
+    }
+
+    /**
+     * Switches between `Main Server` (`video_path`/`video_link`) and `Server 2` (`server1_link`) matching `run_video.php`.
+     */
+    fun switchServer(
+        server: PlaybackServerDto,
+        basePayload: PlaybackAuthorizationPayload,
+        attachExoPlayer: Boolean = true,
+        nowEpochSeconds: Long = System.currentTimeMillis() / 1000L
+    ) {
+        val updatedPayload = basePayload.copy(
+            playbackType = server.type,
+            playbackUrl = server.url,
+            authorizedHlsUrl = server.url,
+            selectedServer = server.id
+        )
+        initializeFromBackendAuthorization(
+            payload = updatedPayload,
+            nowEpochSeconds = nowEpochSeconds,
+            attachExoPlayer = attachExoPlayer
+        )
     }
 
     fun getPlayer(): ExoPlayer? = exoPlayer

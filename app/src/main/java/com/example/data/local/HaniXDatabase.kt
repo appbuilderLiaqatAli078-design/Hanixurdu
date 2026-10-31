@@ -17,7 +17,7 @@ import com.example.data.model.Series
 import kotlinx.coroutines.flow.Flow
 
 // =========================================================================
-// ROOM ENTITIES (Local Cache, Watch History/Continue Watching & Encrypted Downloads)
+// ROOM ENTITIES (Local Cache Only — Never Authority for VIP or Playback)
 // =========================================================================
 
 @Entity(tableName = "cached_movies")
@@ -43,12 +43,12 @@ data class MovieEntity(
 }
 
 fun Movie.toEntity() = MovieEntity(
-    id = id,
+    id = resolvedId,
     title = title,
     description = description,
-    poster = poster,
+    poster = resolvedPoster,
     category = category,
-    isPremium = isPremium == true,
+    isPremium = resolvedIsVip,
     duration = duration
 )
 
@@ -71,10 +71,10 @@ data class SeriesEntity(
 }
 
 fun Series.toEntity() = SeriesEntity(
-    id = id,
-    title = title,
+    id = resolvedId,
+    title = resolvedTitle,
     description = description,
-    poster = poster,
+    poster = resolvedPoster,
     category = category
 )
 
@@ -87,7 +87,11 @@ data class SeasonEntity(
     fun toDomain() = Season(id = id, seriesId = seriesId, seasonName = seasonName)
 }
 
-fun Season.toEntity() = SeasonEntity(id = id, seriesId = seriesId, seasonName = seasonName)
+fun Season.toEntity() = SeasonEntity(
+    id = resolvedId,
+    seriesId = resolvedSeriesKey,
+    seasonName = resolvedSeasonName
+)
 
 @Entity(tableName = "cached_episodes")
 data class EpisodeEntity(
@@ -114,11 +118,11 @@ data class EpisodeEntity(
 
 fun Episode.toEntity() = EpisodeEntity(
     id = id,
-    seasonId = seasonId,
+    seasonId = seasonId.ifBlank { seasonName ?: "1" },
     title = title,
     description = description,
-    poster = poster,
-    isPremium = isPremium == true,
+    poster = resolvedPoster,
+    isPremium = resolvedIsVip,
     duration = duration,
     playbackAvailability = playbackAvailability
 )
@@ -141,7 +145,7 @@ data class WatchHistoryEntity(
 }
 
 /**
- * Stores metadata for app-private, Android Keystore AES-GCM encrypted downloads.
+ * Stores metadata for app-private, Android Keystore AES-GCM encrypted downloads (VIP only).
  * Never persists unrestricted raw Bunny Stream video URLs.
  */
 @Entity(tableName = "encrypted_downloads")
@@ -155,7 +159,7 @@ data class EncryptedDownloadEntity(
     val encryptionIvBase64: String,
     val fileSizeBytes: Long,
     val licenseExpiresAtEpochSeconds: Long,
-    val requiresVipEntitlement: Boolean,
+    val requiresVipEntitlement: Boolean = true,
     val createdAtEpochMs: Long = System.currentTimeMillis()
 ) {
     fun isLicenseExpired(nowEpochSeconds: Long = System.currentTimeMillis() / 1000L): Boolean {

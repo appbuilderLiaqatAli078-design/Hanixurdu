@@ -1,0 +1,19 @@
+# HaniX Urdu REST API v1 — Apache / LiteSpeed Rewrite Configuration (Hostinger)
+# Place inside public_html/api/v1/.htaccess
+
+Options -Indexes -MultiViews
+RewriteEngine On
+
+# Preserve HTTP Authorization header for PHP-FPM / LiteSpeed on Hostinger
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# Enforce HTTPS in production
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Route all API requests to index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]

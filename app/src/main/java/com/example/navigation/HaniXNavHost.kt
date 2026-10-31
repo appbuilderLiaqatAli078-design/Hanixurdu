@@ -67,6 +67,7 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
 
     val authState by viewModel.authState.collectAsState()
     val forgotPasswordState by viewModel.forgotPasswordState.collectAsState()
+    val forgotPinVerifyState by viewModel.forgotPinVerifyState.collectAsState()
     val homeState by viewModel.homeState.collectAsState()
     val moviesState by viewModel.moviesState.collectAsState()
     val selectedMovieState by viewModel.selectedMovieState.collectAsState()
@@ -82,6 +83,8 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
     val playbackAuthState by viewModel.playbackAuthState.collectAsState()
     val downloadActionState by viewModel.downloadActionState.collectAsState()
     val profileUpdateState by viewModel.profileUpdateState.collectAsState()
+    val mindGameState by viewModel.mindGameState.collectAsState()
+    val auditionUploadState by viewModel.auditionUploadState.collectAsState()
     val appSettingsState by viewModel.appSettingsState.collectAsState()
     val appVersionState by viewModel.appVersionState.collectAsState()
     val settingsFeedback by viewModel.settingsFeedbackMessage.collectAsState()
@@ -212,12 +215,12 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
                     )
                 }
 
-                // 4. Registration
+                // 4. Registration (with Secret Recovery PIN from signup.php)
                 composable(HaniXRoutes.REGISTER) {
                     RegisterScreen(
                         authState = authState,
-                        onRegisterSubmit = { name, email, pass ->
-                            viewModel.register(name, email, pass)
+                        onRegisterSubmit = { name, email, pass, secretPin ->
+                            viewModel.register(name, email, pass, secretPin)
                         },
                         onNavigateToLogin = {
                             viewModel.resetAuthFeedback()
@@ -228,11 +231,18 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
                     )
                 }
 
-                // 5. Forgot Password
+                // 5. Forgot Password (supports 2-step email + secret_pin flow from forgot_password.php)
                 composable(HaniXRoutes.FORGOT_PASSWORD) {
                     ForgotPasswordScreen(
                         forgotPasswordState = forgotPasswordState,
+                        forgotPinVerifyState = forgotPinVerifyState,
                         onSubmitEmail = { email -> viewModel.requestPasswordReset(email) },
+                        onVerifySecretPin = { email, pin ->
+                            viewModel.verifyForgotPasswordPin(email, pin)
+                        },
+                        onResetPasswordWithPin = { email, pin, newPass, confirmPass ->
+                            viewModel.resetPasswordWithSecretPin(email, pin, newPass, confirmPass)
+                        },
                         onBackClick = { navController.popBackStack() },
                         onOpenChecklist = { navController.navigate(HaniXRoutes.ABOUT_HANIX) }
                     )
@@ -258,6 +268,7 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
                         onNavigateToSettings = { navController.navigate(HaniXRoutes.APP_SETTINGS) },
                         onNavigateToAbout = { navController.navigate(HaniXRoutes.ABOUT_HANIX) },
                         onNavigateToLogin = { navController.navigate(HaniXRoutes.LOGIN) },
+                        onNavigateToProfile = { navController.navigate(HaniXRoutes.USER_PROFILE) },
                         onMovieSelected = { id -> navController.navigate(HaniXRoutes.movieDetails(id)) },
                         onSeriesSelected = { id -> navController.navigate(HaniXRoutes.seriesDetails(id)) },
                         onResumePlayback = { type, id ->
@@ -331,7 +342,7 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
                     route = HaniXRoutes.MOVIE_DETAILS,
                     arguments = listOf(navArgument("movieId") { type = NavType.StringType })
                 ) { entry ->
-                    val movieId = entry.arguments?.getString("movieId") ?: "1"
+                    val movieId = HaniXRoutes.decodeSegment(entry.arguments?.getString("movieId")).ifEmpty { "1" }
                     MovieDetailsScreen(
                         movieId = movieId,
                         movieState = selectedMovieState,
@@ -354,18 +365,28 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
                     route = HaniXRoutes.SERIES_DETAILS,
                     arguments = listOf(navArgument("seriesId") { type = NavType.StringType })
                 ) { entry ->
-                    val seriesId = entry.arguments?.getString("seriesId") ?: "1"
+                    val seriesId = HaniXRoutes.decodeSegment(entry.arguments?.getString("seriesId")).ifEmpty { "1" }
                     SeriesDetailsScreen(
                         seriesId = seriesId,
                         seriesState = selectedSeriesState,
                         seasonsState = seasonsState,
+                        episodesState = episodesState,
+                        currentUser = currentUser,
                         onLoadSeriesAndSeasons = { id -> viewModel.loadSeriesDetailsAndSeasons(id) },
+                        onLoadSeasonEpisodes = { seasonId -> viewModel.loadSeasonEpisodes(seasonId) },
                         onOpenSeasonSelection = { id ->
                             navController.navigate(HaniXRoutes.seasonSelection(id))
                         },
                         onSelectSeason = { seasonId ->
                             navController.navigate(HaniXRoutes.episodeList(seasonId))
                         },
+                        onPlayEpisode = { episodeId ->
+                            navController.navigate(HaniXRoutes.videoPlayer("episode", episodeId))
+                        },
+                        onDownloadEpisode = { episodeId ->
+                            viewModel.requestEncryptedOfflineDownload("episode", episodeId)
+                        },
+                        onNavigateToVip = { navController.navigate(HaniXRoutes.VIP_MEMBERSHIP) },
                         onBackClick = { navController.popBackStack() },
                         onOpenChecklist = { navController.navigate(HaniXRoutes.ABOUT_HANIX) }
                     )
@@ -376,7 +397,7 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
                     route = HaniXRoutes.SEASON_SELECTION,
                     arguments = listOf(navArgument("seriesId") { type = NavType.StringType })
                 ) { entry ->
-                    val seriesId = entry.arguments?.getString("seriesId") ?: "1"
+                    val seriesId = HaniXRoutes.decodeSegment(entry.arguments?.getString("seriesId")).ifEmpty { "1" }
                     SeasonSelectionScreen(
                         seriesId = seriesId,
                         seasonsState = seasonsState,
@@ -394,10 +415,11 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
                     route = HaniXRoutes.EPISODE_LIST,
                     arguments = listOf(navArgument("seasonId") { type = NavType.StringType })
                 ) { entry ->
-                    val seasonId = entry.arguments?.getString("seasonId") ?: "1"
+                    val seasonId = HaniXRoutes.decodeSegment(entry.arguments?.getString("seasonId")).ifEmpty { "1" }
                     EpisodeListScreen(
                         seasonId = seasonId,
                         episodesState = episodesState,
+                        currentUser = currentUser,
                         onLoadEpisodes = { id -> viewModel.loadSeasonEpisodes(id) },
                         onPlayEpisode = { episodeId ->
                             navController.navigate(HaniXRoutes.videoPlayer("episode", episodeId))
@@ -405,12 +427,13 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
                         onDownloadEpisode = { episodeId ->
                             viewModel.requestEncryptedOfflineDownload("episode", episodeId)
                         },
+                        onNavigateToVip = { navController.navigate(HaniXRoutes.VIP_MEMBERSHIP) },
                         onBackClick = { navController.popBackStack() },
                         onOpenChecklist = { navController.navigate(HaniXRoutes.ABOUT_HANIX) }
                     )
                 }
 
-                // 15. Video Player (Bunny Stream HLS)
+                // 15. Video Player (MovieBox Interactive Player: ExoPlayer + Multi-Server Embeds + Direct Web Player)
                 composable(
                     route = HaniXRoutes.VIDEO_PLAYER,
                     arguments = listOf(
@@ -418,22 +441,41 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
                         navArgument("contentId") { type = NavType.StringType }
                     )
                 ) { entry ->
-                    val contentType = entry.arguments?.getString("contentType") ?: "movie"
-                    val contentId = entry.arguments?.getString("contentId") ?: "1"
+                    val contentType = HaniXRoutes.decodeSegment(entry.arguments?.getString("contentType")).ifEmpty { "movie" }
+                    val contentId = HaniXRoutes.decodeSegment(entry.arguments?.getString("contentId")).ifEmpty { "1" }
+                    val currentEpisodes = (episodesState as? com.example.data.model.RemoteDataState.Success)?.data.orEmpty()
                     VideoPlayerScreen(
                         contentType = contentType,
                         contentId = contentId,
                         playerManager = viewModel.bunnyPlayerManager,
                         playbackAuthState = playbackAuthState,
+                        currentUser = currentUser,
+                        episodesList = currentEpisodes,
+                        downloadActionState = downloadActionState,
                         onAuthorizePlayback = { type, id ->
                             viewModel.authorizeAndStartBunnyPlayback(type, id)
+                        },
+                        onSwitchServer = { server ->
+                            viewModel.switchPlaybackServer(server)
+                        },
+                        onSelectRecommendedMovie = { movieId ->
+                            navController.navigate(HaniXRoutes.videoPlayer("movie", movieId))
+                        },
+                        onSelectRecommendedSeries = { seriesName ->
+                            navController.navigate(HaniXRoutes.seriesDetails(seriesName))
+                        },
+                        onSelectEpisodeFromDrawer = { nextEpId ->
+                            navController.navigate(HaniXRoutes.videoPlayer("episode", nextEpId))
+                        },
+                        onDownloadCurrentMedia = { type, id, quality ->
+                            viewModel.requestEncryptedOfflineDownload(type, id, quality)
                         },
                         onSaveProgress = {
                             viewModel.saveCurrentPlaybackProgress(
                                 contentType = contentType,
                                 contentId = contentId,
                                 title = "HaniX ${contentType.replaceFirstChar { it.uppercase() }} #$contentId",
-                                subtitle = "Bunny Stream HLS",
+                                subtitle = "Cinema Stream",
                                 poster = null
                             )
                         },
@@ -450,24 +492,28 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
                         vipPlansState = vipPlansState,
                         currentUser = currentUser,
                         onLoadVipData = { viewModel.loadVipOverview() },
-                        onVerifyVip = { planId, ref ->
-                            viewModel.verifyVipSubscription(planId, ref)
-                        },
                         onBackClick = { navController.popBackStack() },
                         onOpenChecklist = { navController.navigate(HaniXRoutes.ABOUT_HANIX) }
                     )
                 }
 
-                // 17. User Profile
+                // 17. User Profile, Mind Games & Dubbing Studio
                 composable(HaniXRoutes.USER_PROFILE) {
                     UserProfileScreen(
                         currentUser = currentUser,
                         isAuthenticated = isAuthenticated,
                         profileUpdateState = profileUpdateState,
+                        mindGameState = mindGameState,
+                        auditionUploadState = auditionUploadState,
                         unreadNotifications = unreadNotifications,
                         onUpdateProfile = { name, avatar ->
                             viewModel.updateUserProfile(name, avatar)
                         },
+                        onLoadMindGame = { viewModel.loadMindGameQuiz() },
+                        onUploadAudition = { userName, whatsapp, role, fileUri ->
+                            viewModel.submitStudioAudition(userName, whatsapp, role, fileUri)
+                        },
+                        onResetAuditionFeedback = { viewModel.resetAuditionState() },
                         onNavigateToLogin = { navController.navigate(HaniXRoutes.LOGIN) },
                         onNavigateToVip = { navController.navigate(HaniXRoutes.VIP_MEMBERSHIP) },
                         onNavigateToWatchHistory = { navController.navigate(HaniXRoutes.WATCH_HISTORY) },
@@ -507,7 +553,7 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
                     )
                 }
 
-                // 20. My Downloads
+                // 20. My Downloads (App-Private Offline Vault)
                 composable(HaniXRoutes.MY_DOWNLOADS) {
                     MyDownloadsScreen(
                         encryptedDownloads = encryptedDownloads,
@@ -515,6 +561,9 @@ fun HaniXUrduApp(viewModel: HaniXViewModel) {
                         unreadNotifications = unreadNotifications,
                         onRequestTestDownloadAuth = {
                             viewModel.requestEncryptedOfflineDownload("movie", "1")
+                        },
+                        onPlayDownloadedMedia = { type, id ->
+                            navController.navigate(HaniXRoutes.videoPlayer(type, id))
                         },
                         onDeleteDownload = { id -> viewModel.deleteEncryptedDownload(id) },
                         onNotificationsClick = { navController.navigate(HaniXRoutes.NOTIFICATIONS) },

@@ -1,12 +1,13 @@
 <resources>
     <string name="app_name">HaniX Urdu</string>
-    <string name="tagline">Premium Urdu Cinema &amp; Series Streaming</string>
+    <string name="tagline">Urdu Cinema &amp; Series Streaming</string>
     <string name="backend_pending_banner">PHP REST API v1 &amp; Bunny Stream integration pending deployment on hanixurdu.com</string>
     <string name="nav_home">Home</string>
     <string name="nav_movies">Movies</string>
     <string name="nav_series">Series</string>
     <string name="nav_downloads">Downloads</string>
     <string name="nav_profile">Profile</string>
-    <string name="vip_badge">VVIP</string>
+    <string name="vip_badge">VIP</string>
+    <string name="free_badge">FREE</string>
     <string name="retry_action">Retry Connection</string>
 </resources>

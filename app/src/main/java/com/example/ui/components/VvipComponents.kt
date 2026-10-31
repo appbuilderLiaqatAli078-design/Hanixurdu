@@ -28,10 +28,10 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
@@ -46,7 +46,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -72,6 +71,7 @@ import coil.compose.AsyncImage
 import com.example.data.model.Movie
 import com.example.data.model.RemoteDataState
 import com.example.data.model.Series
+import com.example.data.security.HaniXSecurityShield
 import com.example.navigation.BottomNavTab
 import com.example.ui.theme.AmberPending
 import com.example.ui.theme.CharcoalSurface
@@ -91,6 +91,7 @@ import com.example.ui.theme.VipGoldLight
 
 /**
  * Top Bar for primary HaniX Urdu screens with VIP shortcut, Search, and Notification badge.
+ * Uses only FREE and VIP membership badges (Section 4).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,9 +152,10 @@ fun HaniXTopBar(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (!subtitle.isNullOrBlank()) {
+                    val cleanSubtitle = HaniXSecurityShield.sanitizeUiLabel(subtitle)
+                    if (!cleanSubtitle.isNullOrBlank()) {
                         Text(
-                            text = subtitle,
+                            text = cleanSubtitle,
                             style = MaterialTheme.typography.labelSmall,
                             color = VipChampagneGold,
                             maxLines = 1
@@ -185,7 +187,7 @@ fun HaniXTopBar(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "VVIP",
+                            text = "VIP",
                             style = MaterialTheme.typography.labelMedium,
                             color = VipGoldLight,
                             fontWeight = FontWeight.Bold
@@ -235,7 +237,7 @@ fun HaniXTopBar(
 }
 
 /**
- * VVIP Bottom Navigation Bar with OLED Obsidian finish and Gold active indicators.
+ * Bottom Navigation Bar with OLED Obsidian finish and Gold active indicators.
  */
 @Composable
 fun HaniXBottomNavBar(
@@ -315,8 +317,7 @@ fun VvipGlassCard(
 }
 
 /**
- * Displays honest, transparent diagnostics when a proposed PHP REST API v1 endpoint is
- * pending implementation on `https://hanixurdu.com/api/v1/`, offline, loading, or in error.
+ * Displays Loading, Empty, AuthRequired, PendingBackend, Offline, and Error states (Section 8).
  */
 @Composable
 fun <T> ContractStateBanner(
@@ -345,15 +346,60 @@ fun <T> ContractStateBanner(
                     Spacer(modifier = Modifier.width(14.dp))
                     Column {
                         Text(
-                            text = "Connecting to Hostinger PHP REST API...",
+                            text = "Loading HaniX Urdu Stream...",
                             style = MaterialTheme.typography.titleMedium,
                             color = TextPrimaryIvory
                         )
-                        Text(
-                            text = state.endpoint,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = VipChampagneGold
+                        val cleanEndpoint = HaniXSecurityShield.sanitizeUiLabel(state.endpoint)
+                        if (!cleanEndpoint.isNullOrBlank()) {
+                            Text(
+                                text = cleanEndpoint,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = VipChampagneGold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        is RemoteDataState.AuthRequired -> {
+            VvipGlassCard(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .testTag("contract_state_auth_required"),
+                borderColor = VipChampagneGold
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Authentication Required",
+                            tint = VipChampagneGold
                         )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Authentication Required (${state.endpoint})",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = VipGoldLight
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = state.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondarySilver
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = onRetry,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = VipChampagneGold,
+                            contentColor = OledBlack
+                        ),
+                        modifier = Modifier.testTag("auth_required_retry_button")
+                    ) {
+                        Text("Retry Request", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -377,7 +423,7 @@ fun <T> ContractStateBanner(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Code,
-                                contentDescription = "Pending PHP Backend Endpoint",
+                                contentDescription = "Backend Unavailable / Pending Route",
                                 tint = AmberPending,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -385,7 +431,7 @@ fun <T> ContractStateBanner(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Pending PHP REST API Endpoint",
+                                text = "Backend Route Pending on Hostinger",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = AmberPending,
                                 fontWeight = FontWeight.Bold
@@ -423,7 +469,7 @@ fun <T> ContractStateBanner(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Test Live Endpoint", style = MaterialTheme.typography.labelLarge)
+                            Text("Retry Connection", style = MaterialTheme.typography.labelLarge)
                         }
                         if (onOpenChecklist != null) {
                             OutlinedButton(
@@ -460,7 +506,7 @@ fun <T> ContractStateBanner(
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Offline State (${state.endpoint})",
+                            text = "Network Failure / Offline (${state.endpoint})",
                             style = MaterialTheme.typography.titleMedium,
                             color = TextPrimaryIvory
                         )
@@ -499,14 +545,14 @@ fun <T> ContractStateBanner(
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Backend Response (${state.endpoint})",
+                            text = "Notice",
                             style = MaterialTheme.typography.titleMedium,
                             color = ErrorCoral
                         )
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = state.message,
+                        text = HaniXSecurityShield.sanitizeUiLabel(state.message) ?: state.message,
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondarySilver
                     )
@@ -554,85 +600,144 @@ fun <T> ContractStateBanner(
 
 /**
  * Poster grid card for a Movie from the Hostinger MySQL database.
+ * Displays real posters (poster or poster_path) and explicit FREE or VIP labels (Section 4 & 8).
  */
 @Composable
 fun MoviePosterCard(
     movie: Movie,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    rankNumber: Int? = null,
+    isLandscape: Boolean = false
 ) {
+    val isVip = movie.resolvedIsVip
+    val posterUrl = movie.resolvedPoster
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .testTag("movie_card_${movie.id}"),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = GlassCardSurface),
-        border = BorderStroke(1.dp, if (movie.isPremium == true) VipChampagneGold.copy(alpha = 0.6f) else GlassBorderSubtle)
+            .testTag("movie_card_${movie.resolvedId}"),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF141414)),
+        border = BorderStroke(
+            width = if (isVip) 1.5.dp else 1.dp,
+            color = if (isVip) Color(0xFFFFD700).copy(alpha = 0.75f) else Color.White.copy(alpha = 0.08f)
+        )
     ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(0.7f)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(GlassCardElevated, OledBlack)
-                        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(if (isLandscape) 16f / 9f else 0.68f)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(GlassCardElevated, OledBlack)
                     )
-            ) {
-                if (!movie.poster.isNullOrBlank()) {
-                    AsyncImage(
-                        model = movie.poster,
+                )
+        ) {
+            if (!posterUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = posterUrl,
+                    contentDescription = movie.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Movie,
                         contentDescription = movie.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                        tint = VipChampagneGold.copy(alpha = 0.5f),
+                        modifier = Modifier.size(42.dp)
                     )
-                } else {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Movie,
-                            contentDescription = movie.title,
-                            tint = VipChampagneGold.copy(alpha = 0.5f),
-                            modifier = Modifier.size(42.dp)
-                        )
-                    }
-                }
-
-                if (movie.isPremium == true) {
-                    Surface(
-                        color = VipChampagneGold,
-                        shape = RoundedCornerShape(bottomStart = 10.dp),
-                        modifier = Modifier.align(Alignment.TopEnd)
-                    ) {
-                        Text(
-                            text = "VVIP",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = OledBlack,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
                 }
             }
 
-            Column(modifier = Modifier.padding(10.dp)) {
+            // Bottom gradient overlay for title & rank number (matching .poster-overlay in style.css)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.25f),
+                                Color.Black.copy(alpha = 0.92f)
+                            )
+                        )
+                    )
+            )
+
+            // VIP Crown / FREE Badge on top-left or top-right
+            if (isVip) {
+                Surface(
+                    color = Color(0xFFFFD700),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = "🔒 Unlock VIP",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.Black,
+                        fontWeight = FontWeight.ExtraBold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            } else {
+                Surface(
+                    color = CharcoalSurface.copy(alpha = 0.85f),
+                    shape = RoundedCornerShape(bottomStart = 8.dp),
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    Text(
+                        text = "FREE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = EmeraldVerified,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            // Title at bottom-left
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 10.dp, end = if (rankNumber != null) 42.dp else 10.dp, bottom = 10.dp)
+            ) {
                 Text(
                     text = movie.title,
                     style = MaterialTheme.typography.titleSmall,
-                    color = TextPrimaryIvory,
-                    maxLines = 1,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                if (movie.resolvedIsSeriesItem) {
+                    Text(
+                        text = "Series • Urdu",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFFF0000),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            // Large Rank Number at bottom-right (matching .poster-number in index.php)
+            if (rankNumber != null) {
                 Text(
-                    text = listOfNotNull(movie.category, movie.duration).joinToString(" • ").ifBlank { "Urdu Cinema" },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondarySilver,
-                    maxLines = 1
+                    text = rankNumber.toString(),
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = Color.White.copy(alpha = 0.92f),
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 8.dp, bottom = 2.dp)
                 )
             }
         }
@@ -646,63 +751,118 @@ fun MoviePosterCard(
 fun SeriesPosterCard(
     series: Series,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    rankNumber: Int? = null
 ) {
+    val posterUrl = series.resolvedPoster
+    val titleText = series.resolvedTitle
+    val isVip = series.resolvedIsVip
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .testTag("series_card_${series.id}"),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = GlassCardSurface),
-        border = BorderStroke(1.dp, GlassBorderSubtle)
+            .testTag("series_card_${series.resolvedId}"),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF141414)),
+        border = BorderStroke(
+            width = if (isVip) 1.5.dp else 1.dp,
+            color = if (isVip) Color(0xFFFFD700).copy(alpha = 0.75f) else Color.White.copy(alpha = 0.08f)
+        )
     ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(0.7f)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(GlassCardElevated, OledBlack)
-                        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.68f)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(GlassCardElevated, OledBlack)
                     )
-            ) {
-                if (!series.poster.isNullOrBlank()) {
-                    AsyncImage(
-                        model = series.poster,
-                        contentDescription = series.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                )
+        ) {
+            if (!posterUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = posterUrl,
+                    contentDescription = titleText,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LiveTv,
+                        contentDescription = titleText,
+                        tint = VipChampagneGold.copy(alpha = 0.5f),
+                        modifier = Modifier.size(42.dp)
                     )
-                } else {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.LiveTv,
-                            contentDescription = series.title,
-                            tint = VipChampagneGold.copy(alpha = 0.5f),
-                            modifier = Modifier.size(42.dp)
-                        )
-                    }
                 }
             }
-            Column(modifier = Modifier.padding(10.dp)) {
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.25f),
+                                Color.Black.copy(alpha = 0.92f)
+                            )
+                        )
+                    )
+            )
+
+            if (isVip) {
+                Surface(
+                    color = Color(0xFFFFD700),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = "👑 VIP",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.Black,
+                        fontWeight = FontWeight.ExtraBold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 10.dp, end = if (rankNumber != null) 40.dp else 10.dp, bottom = 10.dp)
+            ) {
                 Text(
-                    text = series.title,
+                    text = titleText,
                     style = MaterialTheme.typography.titleSmall,
-                    color = TextPrimaryIvory,
-                    maxLines = 1,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = series.category ?: "Urdu Series",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = VipChampagneGold,
+                    text = "Urdu Series",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFFFFD700),
                     maxLines = 1
+                )
+            }
+
+            if (rankNumber != null) {
+                Text(
+                    text = rankNumber.toString(),
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = Color.White.copy(alpha = 0.92f),
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 8.dp, bottom = 2.dp)
                 )
             }
         }
@@ -733,7 +893,7 @@ fun SecurityAssuranceStrip(modifier: Modifier = Modifier) {
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                text = "HTTPS TLS 1.3 • Android Keystore AES-256 • Server-Side Bunny & VIP Auth",
+                text = "HTTPS TLS 1.3 • Keystore AES-256 • FREE & VIP Backend Verified",
                 style = MaterialTheme.typography.labelSmall,
                 color = TextSecondarySilver
             )

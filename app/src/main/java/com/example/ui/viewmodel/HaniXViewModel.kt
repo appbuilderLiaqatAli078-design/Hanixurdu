@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.EncryptedDownloadEntity
@@ -9,12 +10,17 @@ import com.example.data.local.NotificationEntity
 import com.example.data.local.WatchHistoryEntity
 import com.example.data.model.AppSettingsPayload
 import com.example.data.model.AppVersionPayload
+import com.example.data.model.AuditionUploadPayload
 import com.example.data.model.AuthSessionPayload
 import com.example.data.model.CategoryItem
+import com.example.data.model.CommunityUpdatesPayload
 import com.example.data.model.Episode
+import com.example.data.model.ForgotPasswordVerifyResponse
 import com.example.data.model.HomePayload
+import com.example.data.model.MindGamePayload
 import com.example.data.model.Movie
 import com.example.data.model.PlaybackAuthorizationPayload
+import com.example.data.model.PlaybackServerDto
 import com.example.data.model.RemoteDataState
 import com.example.data.model.SearchPayload
 import com.example.data.model.Season
@@ -78,6 +84,9 @@ class HaniXViewModel(application: Application) : AndroidViewModel(application) {
     private val _forgotPasswordState = MutableStateFlow<RemoteDataState<Unit>>(RemoteDataState.Idle)
     val forgotPasswordState: StateFlow<RemoteDataState<Unit>> = _forgotPasswordState.asStateFlow()
 
+    private val _forgotPinVerifyState = MutableStateFlow<RemoteDataState<ForgotPasswordVerifyResponse>>(RemoteDataState.Idle)
+    val forgotPinVerifyState: StateFlow<RemoteDataState<ForgotPasswordVerifyResponse>> = _forgotPinVerifyState.asStateFlow()
+
     private val _homeState = MutableStateFlow<RemoteDataState<HomePayload>>(RemoteDataState.Idle)
     val homeState: StateFlow<RemoteDataState<HomePayload>> = _homeState.asStateFlow()
 
@@ -120,6 +129,15 @@ class HaniXViewModel(application: Application) : AndroidViewModel(application) {
     private val _downloadActionState = MutableStateFlow<RemoteDataState<EncryptedDownloadEntity>>(RemoteDataState.Idle)
     val downloadActionState: StateFlow<RemoteDataState<EncryptedDownloadEntity>> = _downloadActionState.asStateFlow()
 
+    private val _mindGameState = MutableStateFlow<RemoteDataState<MindGamePayload>>(RemoteDataState.Idle)
+    val mindGameState: StateFlow<RemoteDataState<MindGamePayload>> = _mindGameState.asStateFlow()
+
+    private val _auditionUploadState = MutableStateFlow<RemoteDataState<AuditionUploadPayload>>(RemoteDataState.Idle)
+    val auditionUploadState: StateFlow<RemoteDataState<AuditionUploadPayload>> = _auditionUploadState.asStateFlow()
+
+    private val _communityUpdatesState = MutableStateFlow<RemoteDataState<CommunityUpdatesPayload>>(RemoteDataState.Idle)
+    val communityUpdatesState: StateFlow<RemoteDataState<CommunityUpdatesPayload>> = _communityUpdatesState.asStateFlow()
+
     private val _profileUpdateState = MutableStateFlow<RemoteDataState<User>>(RemoteDataState.Idle)
     val profileUpdateState: StateFlow<RemoteDataState<User>> = _profileUpdateState.asStateFlow()
 
@@ -135,6 +153,10 @@ class HaniXViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             repository.initializeSystemNotificationsIfNeeded()
+            if (sessionManager.currentUser.value != null) {
+                repository.fetchCurrentUser()
+                _vipStatusState.value = repository.fetchVipStatus()
+            }
         }
     }
 
@@ -145,26 +167,61 @@ class HaniXViewModel(application: Application) : AndroidViewModel(application) {
     fun resetAuthFeedback() {
         _authState.value = RemoteDataState.Idle
         _forgotPasswordState.value = RemoteDataState.Idle
+        _forgotPinVerifyState.value = RemoteDataState.Idle
     }
 
     fun login(email: String, password: String) {
         viewModelScope.launch {
             _authState.value = RemoteDataState.Loading("POST /auth/login")
-            _authState.value = repository.login(email, password)
+            val result = repository.login(email, password)
+            _authState.value = result
+            if (result is RemoteDataState.Success) {
+                _vipStatusState.value = repository.fetchVipStatus()
+                loadHomeDashboard()
+            }
         }
     }
 
-    fun register(name: String, email: String, password: String) {
+    fun register(name: String, email: String, password: String, secretPin: String = "") {
         viewModelScope.launch {
             _authState.value = RemoteDataState.Loading("POST /auth/register")
-            _authState.value = repository.register(name, email, password)
+            val result = repository.register(name, email, password, secretPin)
+            _authState.value = result
+            if (result is RemoteDataState.Success) {
+                _vipStatusState.value = repository.fetchVipStatus()
+                loadHomeDashboard()
+            }
         }
     }
 
-    fun requestPasswordReset(email: String) {
+    fun requestPasswordReset(email: String, secretPin: String? = null) {
         viewModelScope.launch {
             _forgotPasswordState.value = RemoteDataState.Loading("POST /auth/forgot-password")
-            _forgotPasswordState.value = repository.forgotPassword(email)
+            _forgotPasswordState.value = repository.forgotPassword(email, secretPin)
+        }
+    }
+
+    fun verifyForgotPasswordPin(email: String, secretPin: String) {
+        viewModelScope.launch {
+            _forgotPinVerifyState.value = RemoteDataState.Loading("POST /auth/forgot-password/verify")
+            _forgotPinVerifyState.value = repository.verifyForgotPasswordPin(email, secretPin)
+        }
+    }
+
+    fun resetPasswordWithSecretPin(
+        email: String,
+        secretPin: String,
+        newPassword: String,
+        resetToken: String? = null
+    ) {
+        viewModelScope.launch {
+            _forgotPasswordState.value = RemoteDataState.Loading("POST /auth/forgot-password/reset")
+            _forgotPasswordState.value = repository.resetForgotPasswordWithPin(
+                email = email,
+                secretPin = secretPin,
+                newPassword = newPassword,
+                resetToken = resetToken
+            )
         }
     }
 
@@ -251,18 +308,15 @@ class HaniXViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun verifyVipSubscription(planId: String, voucherOrRef: String) {
-        viewModelScope.launch {
-            _vipStatusState.value = RemoteDataState.Loading("POST /vip/verify")
-            _vipStatusState.value = repository.verifyVipEntitlement(planId, voucherOrRef)
-        }
-    }
-
-    fun authorizeAndStartBunnyPlayback(contentType: String, contentId: String) {
+    fun authorizeAndStartBunnyPlayback(
+        contentType: String,
+        contentId: String,
+        preferredServer: String? = null
+    ) {
         viewModelScope.launch {
             bunnyPlayerManager.setAuthorizing()
             _playbackAuthState.value = RemoteDataState.Loading("POST /playback/authorize")
-            val result = repository.requestPlaybackAuthorization(contentType, contentId)
+            val result = repository.requestPlaybackAuthorization(contentType, contentId, preferredServer)
             _playbackAuthState.value = result
             when (result) {
                 is RemoteDataState.Success -> {
@@ -271,8 +325,23 @@ class HaniXViewModel(application: Application) : AndroidViewModel(application) {
                 is RemoteDataState.PendingBackend -> {
                     bunnyPlayerManager.setBackendPending(result.endpoint, result.details)
                 }
-                is RemoteDataState.Error -> {
+                is RemoteDataState.AuthRequired -> {
                     bunnyPlayerManager.setError(result.message)
+                }
+                is RemoteDataState.Error -> {
+                    if (result.httpCode == 403) {
+                        bunnyPlayerManager.initializeFromBackendAuthorization(
+                            PlaybackAuthorizationPayload(
+                                contentId = contentId,
+                                contentType = contentType,
+                                requiresVip = true,
+                                isAuthorized = false,
+                                membershipRequired = "VIP"
+                            )
+                        )
+                    } else {
+                        bunnyPlayerManager.setError(result.message)
+                    }
                 }
                 is RemoteDataState.Offline -> {
                     bunnyPlayerManager.setError(result.message)
@@ -280,6 +349,11 @@ class HaniXViewModel(application: Application) : AndroidViewModel(application) {
                 else -> Unit
             }
         }
+    }
+
+    fun switchPlaybackServer(server: PlaybackServerDto) {
+        val currentAuth = (_playbackAuthState.value as? RemoteDataState.Success)?.data ?: return
+        bunnyPlayerManager.switchServer(server, currentAuth)
     }
 
     fun saveCurrentPlaybackProgress(
@@ -304,6 +378,31 @@ class HaniXViewModel(application: Application) : AndroidViewModel(application) {
                     durationMs = dur
                 )
             }
+        }
+    }
+
+    fun loadMindGameQuiz() {
+        viewModelScope.launch {
+            _mindGameState.value = RemoteDataState.Loading("GET /mind-game/questions")
+            _mindGameState.value = repository.fetchMindGameQuestions()
+        }
+    }
+
+    fun submitStudioAudition(userName: String, whatsapp: String, role: String, fileUri: Uri) {
+        viewModelScope.launch {
+            _auditionUploadState.value = RemoteDataState.Loading("POST /studio/audition")
+            _auditionUploadState.value = repository.submitStudioAudition(userName, whatsapp, role, fileUri)
+        }
+    }
+
+    fun resetAuditionState() {
+        _auditionUploadState.value = RemoteDataState.Idle
+    }
+
+    fun loadCommunityUpdates() {
+        viewModelScope.launch {
+            _communityUpdatesState.value = RemoteDataState.Loading("GET /updates")
+            _communityUpdatesState.value = repository.fetchCommunityUpdates()
         }
     }
 

@@ -28,11 +28,18 @@ object HaniXRoutes {
     const val APP_SETTINGS = "app_settings"
     const val ABOUT_HANIX = "about_hanix"
 
-    fun movieDetails(movieId: String) = "movie_details/$movieId"
-    fun seriesDetails(seriesId: String) = "series_details/$seriesId"
-    fun seasonSelection(seriesId: String) = "season_selection/$seriesId"
-    fun episodeList(seasonId: String) = "episode_list/$seasonId"
-    fun videoPlayer(contentType: String, contentId: String) = "video_player/$contentType/$contentId"
+    private fun encodeSegment(value: String): String =
+        java.net.URLEncoder.encode(value, "UTF-8").replace("+", "%20")
+
+    fun decodeSegment(value: String?): String =
+        if (value.isNullOrEmpty()) "" else runCatching { java.net.URLDecoder.decode(value, "UTF-8") }.getOrDefault(value)
+
+    fun movieDetails(movieId: String) = "movie_details/${encodeSegment(movieId)}"
+    fun seriesDetails(seriesId: String) = "series_details/${encodeSegment(seriesId)}"
+    fun seasonSelection(seriesId: String) = "season_selection/${encodeSegment(seriesId)}"
+    fun episodeList(seasonId: String) = "episode_list/${encodeSegment(seasonId)}"
+    fun videoPlayer(contentType: String, contentId: String) =
+        "video_player/${encodeSegment(contentType)}/${encodeSegment(contentId)}"
 }
 
 enum class BottomNavTab(

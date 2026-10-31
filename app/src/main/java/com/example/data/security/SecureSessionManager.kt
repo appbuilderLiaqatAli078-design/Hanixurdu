@@ -2,20 +2,42 @@ package com.example.data.security
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import com.example.BuildConfig
+import com.example.data.model.MembershipTier
 import com.example.data.model.User
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+private val Context.hanixDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "hanix_urdu_preferences"
+)
 
 /**
  * Manages authenticated session state, Android Keystore-encrypted Bearer tokens,
- * configurable HTTPS REST API base URL, and onboarding completion.
+ * DataStore app preferences, and HTTPS API base URL configuration.
+ *
+ * Strict Membership Security (Section 4 & Section 14):
+ * - Every unverified or newly registered user starts as FREE.
+ * - Never grants VIP from hardcoded Android values.
+ * - Local cached user data is strictly a UI display cache; expired VIP dates immediately
+ *   downgrade to FREE, and all VIP playback/download operations are verified by the PHP backend.
  */
 class SecureSessionManager(
-    context: Context,
+    private val context: Context,
     private val cryptoManager: KeystoreCryptoManager = KeystoreCryptoManager()
 ) {
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val prefs: SharedPreferences =
         context.getSharedPreferences("hanix_urdu_secure_session", Context.MODE_PRIVATE)
 
@@ -39,6 +61,11 @@ class SecureSessionManager(
     fun completeOnboarding() {
         prefs.edit().putBoolean(KEY_ONBOARDING_DONE, true).apply()
         _onboardingCompleted.value = true
+        ioScope.launch {
+            context.hanixDataStore.edit { store ->
+                store[DS_ONBOARDING_DONE] = true
+            }
+        }
     }
 
     fun saveAuthenticatedSession(
@@ -46,6 +73,7 @@ class SecureSessionManager(
         refreshToken: String?,
         user: User
     ) {
+        val normalizedUser = sanitizeUserMembership(user)
         val encAccess = cryptoManager.encryptString(accessToken)
         val encRefresh = refreshToken?.let { cryptoManager.encryptString(it) }
         prefs.edit().apply {
@@ -53,30 +81,76 @@ class SecureSessionManager(
             if (encRefresh != null) {
                 putString(KEY_ENC_REFRESH_TOKEN, encRefresh)
             }
-            putString(KEY_USER_ID, user.id)
-            putString(KEY_USER_NAME, user.name)
-            putString(KEY_USER_EMAIL, user.email)
-            putString(KEY_USER_AVATAR, user.profileImage)
-            putBoolean(KEY_USER_VIP_STATUS, user.vipStatus == true)
-            putString(KEY_USER_VIP_EXPIRY, user.vipExpiry)
+            putString(KEY_USER_ID, normalizedUser.id)
+            putString(KEY_USER_NAME, normalizedUser.name)
+            putString(KEY_USER_EMAIL, normalizedUser.email)
+            putString(KEY_USER_AVATAR, normalizedUser.resolvedProfileImage)
+            putString(KEY_USER_MEMBERSHIP, normalizedUser.effectiveMembershipTier().name)
+            putBoolean(KEY_USER_VIP_STATUS, normalizedUser.isActiveVip)
+            putString(KEY_USER_VIP_EXPIRY, normalizedUser.resolvedExpiryDate)
+            if (normalizedUser.vipExpiryEpochSeconds != null) {
+                putLong(KEY_USER_VIP_EXPIRY_EPOCH, normalizedUser.vipExpiryEpochSeconds)
+            } else {
+                remove(KEY_USER_VIP_EXPIRY_EPOCH)
+            }
             apply()
         }
-        _currentUser.value = user
+        _currentUser.value = normalizedUser
         _isAuthenticated.value = true
         _sessionExpiredMessage.value = null
     }
 
-    fun updateCurrentUser(user: User) {
+    fun updateRotatedTokens(accessToken: String, refreshToken: String?) {
+        val encAccess = cryptoManager.encryptString(accessToken)
         prefs.edit().apply {
-            putString(KEY_USER_ID, user.id)
-            putString(KEY_USER_NAME, user.name)
-            putString(KEY_USER_EMAIL, user.email)
-            putString(KEY_USER_AVATAR, user.profileImage)
-            putBoolean(KEY_USER_VIP_STATUS, user.vipStatus == true)
-            putString(KEY_USER_VIP_EXPIRY, user.vipExpiry)
+            putString(KEY_ENC_ACCESS_TOKEN, encAccess)
+            if (!refreshToken.isNullOrBlank()) {
+                putString(KEY_ENC_REFRESH_TOKEN, cryptoManager.encryptString(refreshToken))
+            }
             apply()
         }
-        _currentUser.value = user
+        _isAuthenticated.value = true
+    }
+
+    fun updateCurrentUser(user: User) {
+        val normalizedUser = sanitizeUserMembership(user)
+        prefs.edit().apply {
+            putString(KEY_USER_ID, normalizedUser.id)
+            putString(KEY_USER_NAME, normalizedUser.name)
+            putString(KEY_USER_EMAIL, normalizedUser.email)
+            putString(KEY_USER_AVATAR, normalizedUser.resolvedProfileImage)
+            putString(KEY_USER_MEMBERSHIP, normalizedUser.effectiveMembershipTier().name)
+            putBoolean(KEY_USER_VIP_STATUS, normalizedUser.isActiveVip)
+            putString(KEY_USER_VIP_EXPIRY, normalizedUser.resolvedExpiryDate)
+            if (normalizedUser.vipExpiryEpochSeconds != null) {
+                putLong(KEY_USER_VIP_EXPIRY_EPOCH, normalizedUser.vipExpiryEpochSeconds)
+            } else {
+                remove(KEY_USER_VIP_EXPIRY_EPOCH)
+            }
+            apply()
+        }
+        _currentUser.value = normalizedUser
+    }
+
+    fun applyServerVipStatus(tier: MembershipTier, expiryDate: String?, expiryEpochSeconds: Long?) {
+        val current = _currentUser.value ?: return
+        val updated = current.copy(
+            membership = tier.name,
+            vipStatus = (tier == MembershipTier.VIP),
+            vipExpiry = expiryDate,
+            vipExpiryEpochSeconds = expiryEpochSeconds
+        )
+        updateCurrentUser(updated)
+    }
+
+    private fun sanitizeUserMembership(user: User): User {
+        val effectiveTier = user.effectiveMembershipTier()
+        return user.copy(
+            membership = effectiveTier.name,
+            vipStatus = (effectiveTier == MembershipTier.VIP),
+            profileImage = user.resolvedProfileImage,
+            vipExpiry = user.resolvedExpiryDate
+        )
     }
 
     fun getAccessToken(): String? {
@@ -97,8 +171,10 @@ class SecureSessionManager(
             remove(KEY_USER_NAME)
             remove(KEY_USER_EMAIL)
             remove(KEY_USER_AVATAR)
+            remove(KEY_USER_MEMBERSHIP)
             remove(KEY_USER_VIP_STATUS)
             remove(KEY_USER_VIP_EXPIRY)
+            remove(KEY_USER_VIP_EXPIRY_EPOCH)
             apply()
         }
         _currentUser.value = null
@@ -114,7 +190,6 @@ class SecureSessionManager(
 
     /**
      * Strictly enforces HTTPS for the Hostinger PHP REST API base URL.
-     * Rejects cleartext http:// URLs per Section 10 security requirements.
      */
     fun updateApiBaseUrl(rawUrl: String): Result<String> {
         val trimmed = rawUrl.trim()
@@ -126,6 +201,11 @@ class SecureSessionManager(
         val normalized = if (trimmed.endsWith("/")) trimmed else "$trimmed/"
         prefs.edit().putString(KEY_API_BASE_URL, normalized).apply()
         _apiBaseUrl.value = normalized
+        ioScope.launch {
+            context.hanixDataStore.edit { store ->
+                store[DS_API_BASE_URL] = normalized
+            }
+        }
         return Result.success(normalized)
     }
 
@@ -138,14 +218,32 @@ class SecureSessionManager(
     }
 
     private fun loadSavedUser(): User? {
+        // Never restore a user profile if no valid encrypted access token exists
+        if (getAccessToken() == null) return null
         val id = prefs.getString(KEY_USER_ID, null) ?: return null
+        val expiryStr = prefs.getString(KEY_USER_VIP_EXPIRY, null)
+        val expiryEpoch = if (prefs.contains(KEY_USER_VIP_EXPIRY_EPOCH)) {
+            prefs.getLong(KEY_USER_VIP_EXPIRY_EPOCH, 0L).takeIf { it > 0L }
+        } else null
+        val rawMembership = prefs.getString(KEY_USER_MEMBERSHIP, "FREE")
+        val rawVipFlag = prefs.getBoolean(KEY_USER_VIP_STATUS, false)
+
+        val resolvedTier = MembershipTier.resolve(
+            rawMembership = rawMembership,
+            vipStatusFlag = rawVipFlag,
+            vipExpiryEpochSeconds = expiryEpoch,
+            vipExpiryDateStr = expiryStr
+        )
+
         return User(
             id = id,
             name = prefs.getString(KEY_USER_NAME, null),
             email = prefs.getString(KEY_USER_EMAIL, null),
             profileImage = prefs.getString(KEY_USER_AVATAR, null),
-            vipStatus = prefs.getBoolean(KEY_USER_VIP_STATUS, false),
-            vipExpiry = prefs.getString(KEY_USER_VIP_EXPIRY, null)
+            membership = resolvedTier.name,
+            vipStatus = (resolvedTier == MembershipTier.VIP),
+            vipExpiry = expiryStr,
+            vipExpiryEpochSeconds = expiryEpoch
         )
     }
 
@@ -157,8 +255,13 @@ class SecureSessionManager(
         private const val KEY_USER_NAME = "user_name"
         private const val KEY_USER_EMAIL = "user_email"
         private const val KEY_USER_AVATAR = "user_avatar"
+        private const val KEY_USER_MEMBERSHIP = "user_membership"
         private const val KEY_USER_VIP_STATUS = "user_vip_status"
         private const val KEY_USER_VIP_EXPIRY = "user_vip_expiry"
+        private const val KEY_USER_VIP_EXPIRY_EPOCH = "user_vip_expiry_epoch"
         private const val KEY_API_BASE_URL = "api_base_url"
+
+        private val DS_ONBOARDING_DONE = booleanPreferencesKey("ds_onboarding_done")
+        private val DS_API_BASE_URL = stringPreferencesKey("ds_api_base_url")
     }
 }

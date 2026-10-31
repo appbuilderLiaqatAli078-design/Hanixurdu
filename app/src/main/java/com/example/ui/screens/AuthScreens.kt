@@ -3,11 +3,11 @@ package com.example.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,10 +25,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MovieFilter
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -57,7 +57,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -65,7 +67,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.R
 import com.example.data.model.AuthSessionPayload
+import com.example.data.model.ForgotPasswordVerifyResponse
 import com.example.data.model.RemoteDataState
 import com.example.ui.components.ContractStateBanner
 import com.example.ui.components.HaniXTopBar
@@ -94,13 +98,9 @@ fun SplashScreen(
     isAuthenticated: Boolean,
     onNavigateNext: (String) -> Unit
 ) {
-    LaunchedEffect(onboardingCompleted, isAuthenticated) {
-        delay(900)
-        if (!onboardingCompleted) {
-            onNavigateNext("onboarding")
-        } else {
-            onNavigateNext("home")
-        }
+    LaunchedEffect(Unit) {
+        delay(800)
+        onNavigateNext("home")
     }
 
     Box(
@@ -108,7 +108,7 @@ fun SplashScreen(
             .fillMaxSize()
             .background(
                 Brush.radialGradient(
-                    colors = listOf(Color(0xFF1E172A), OledBlack),
+                    colors = listOf(Color(0xFF1A0000), OledBlack),
                     radius = 900f
                 )
             )
@@ -119,45 +119,46 @@ fun SplashScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(32.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(104.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(VipChampagneGold, CinemaCrimson)
-                        )
-                    ),
-                contentAlignment = Alignment.Center
+            Surface(
+                modifier = Modifier.size(104.dp),
+                shape = RoundedCornerShape(24.dp),
+                color = OledBlack,
+                border = BorderStroke(1.5.dp, Color(0xFFFF0000).copy(alpha = 0.8f))
             ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "HaniX Urdu Emblem",
-                    tint = OledBlack,
-                    modifier = Modifier.size(56.dp)
+                Image(
+                    painter = painterResource(id = R.drawable.hanix_seologo),
+                    contentDescription = "HaniX Urdu Official Emblem",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
                 )
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Hani",
+                    style = MaterialTheme.typography.displayMedium,
+                    color = TextPrimaryIvory,
+                    fontWeight = FontWeight.Black
+                )
+                Text(
+                    text = "X",
+                    style = MaterialTheme.typography.displayMedium,
+                    color = Color(0xFFFF0000),
+                    fontWeight = FontWeight.Black
+                )
+            }
             Text(
-                text = "HaniX Urdu",
-                style = MaterialTheme.typography.displayMedium,
-                color = TextPrimaryIvory,
+                text = "U R D U",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color(0xFFAAAAAA),
                 fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "VVIP URDU CINEMA & SERIES",
-                style = MaterialTheme.typography.labelMedium,
-                color = VipChampagneGold
-            )
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             TextButton(
-                onClick = {
-                    if (!onboardingCompleted) onNavigateNext("onboarding") else onNavigateNext("home")
-                },
+                onClick = { onNavigateNext("home") },
                 modifier = Modifier.testTag("splash_continue_button")
             ) {
-                Text("Enter Cinema Lounge", color = VipGoldLight)
+                Text("Enter HaniX Urdu", color = Color(0xFFFF0000), fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -183,20 +184,20 @@ fun OnboardingScreen(
         OnboardingSlide(
             badge = "UNIFIED HOSTINGER BACKEND",
             title = "One Account Across Web & Android",
-            description = "Directly connects to your existing Hostinger MySQL database via the proposed /api/v1/ REST contract. Movies, Series, Seasons, Episodes, and VIP status stay synchronized with hanixurdu.com.",
+            description = "Directly connects to your existing Hostinger MySQL database (`u471204769_hanix_db`) via the /api/v1/ REST contract. Movies, Series, Seasons, Episodes, Mind Games, and FREE/VIP membership stay synchronized with hanixurdu.com.",
             phpReference = "Shares data with index.php, series.php, view_series.php & shahkot.php"
         ),
         OnboardingSlide(
-            badge = "BUNNY STREAM HLS ADAPTIVE",
-            title = "Server-Signed Cinema Playback",
-            description = "Every stream is authorized server-side via POST /playback/authorize. Short-lived Bunny Stream HLS tokens protect premium content with zero Bunny API secrets inside the APK.",
-            phpReference = "Replaces direct URL exposure in run_video.php & check_premium.php"
+            badge = "EXOPLAYER + MULTI-SERVER EMBEDS",
+            title = "Multi-Source Cinema Playback",
+            description = "Supports native Media3 ExoPlayer (for direct video_path MP4s and signed Bunny Stream HLS) plus Main Server & Server 2 switching for YouTube, Rumble, Dailymotion, and Google Drive /preview sources.",
+            phpReference = "Matches run_video.php multi-server & check_premium.php logic"
         ),
         OnboardingSlide(
-            badge = "ANDROID KEYSTORE SECURITY",
-            title = "Encrypted Offline Downloads & VVIP",
-            description = "Access tokens and offline downloads are encrypted with hardware-backed AES-256-GCM in Android Keystore, with server-verified VIP entitlement checks.",
-            phpReference = "Integrates with add_premium.php & unlock_vip.php"
+            badge = "FREE & VIP MEMBERSHIP",
+            title = "JazzCash & WhatsApp VIP Activation",
+            description = "Every account starts as FREE. Upgrade to VIP via JazzCash (03294806457 — Muhammad Hasnain) and WhatsApp activation (923160450074) verified against premium_users.expiry_date.",
+            phpReference = "Integrates with check_premium.php, add_premium.php, unlock_vip.php & shahkot.php"
         )
     )
 
@@ -419,7 +420,7 @@ fun LoginScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Use your existing hanixurdu.com account credentials. Password verification is performed securely on the Hostinger PHP backend.",
+                        text = "Use your existing hanixurdu.com account credentials (`users.email` & `users.password`). Password verification (`password_verify`) and VIP status (`premium_users.expiry_date`) are resolved on the Hostinger PHP backend.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondarySilver
                     )
@@ -496,7 +497,7 @@ fun LoginScreen(
                             onClick = onNavigateToForgotPassword,
                             modifier = Modifier.testTag("login_forgot_password_button")
                         ) {
-                            Text("Forgot Password?", color = VipChampagneGold)
+                            Text("Forgot Password (Secret PIN)?", color = VipChampagneGold)
                         }
                     }
 
@@ -568,7 +569,7 @@ fun LoginScreen(
 @Composable
 fun RegisterScreen(
     authState: RemoteDataState<AuthSessionPayload>,
-    onRegisterSubmit: (String, String, String) -> Unit,
+    onRegisterSubmit: (String, String, String, String) -> Unit,
     onNavigateToLogin: () -> Unit,
     onBackClick: () -> Unit,
     onOpenChecklist: () -> Unit
@@ -577,6 +578,7 @@ fun RegisterScreen(
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var confirmPassword by rememberSaveable { mutableStateOf("") }
+    var secretPin by rememberSaveable { mutableStateOf("") }
     var validationError by rememberSaveable { mutableStateOf<String?>(null) }
 
     LaunchedEffect(authState) {
@@ -613,7 +615,7 @@ fun RegisterScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Registers a shared user account in your Hostinger MySQL database for both web and Android access.",
+                        text = "Registers a shared account in `users (email, password, secret_pin)` on your Hostinger MySQL database. Every new account starts on the FREE plan.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondarySilver
                     )
@@ -696,6 +698,26 @@ fun RegisterScreen(
                             .testTag("register_confirm_password_input")
                     )
 
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = secretPin,
+                        onValueChange = {
+                            secretPin = it
+                            validationError = null
+                        },
+                        label = { Text("Secret Recovery PIN (4+ digits — signup.php)") },
+                        leadingIcon = {
+                            Icon(Icons.Default.Key, contentDescription = "Secret PIN", tint = VipChampagneGold)
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        colors = hanixTextFieldColors(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("register_secret_pin_input")
+                    )
+
                     AnimatedVisibility(visible = validationError != null) {
                         Text(
                             text = validationError.orEmpty(),
@@ -716,8 +738,15 @@ fun RegisterScreen(
                                     validationError = "Password must be at least 8 characters."
                                 password != confirmPassword ->
                                     validationError = "Passwords do not match."
+                                secretPin.isNotBlank() && secretPin.length < 4 ->
+                                    validationError = "Secret Recovery PIN must be at least 4 digits."
                                 else ->
-                                    onRegisterSubmit(name, email, password)
+                                    onRegisterSubmit(
+                                        name,
+                                        email,
+                                        password,
+                                        secretPin.ifBlank { "0000" }
+                                    )
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -742,7 +771,7 @@ fun RegisterScreen(
                 state = authState,
                 onRetry = {
                     if (name.isNotBlank() && email.isNotBlank() && password.length >= 8) {
-                        onRegisterSubmit(name, email, password)
+                        onRegisterSubmit(name, email, password, secretPin.ifBlank { "0000" })
                     }
                 },
                 onOpenChecklist = onOpenChecklist
@@ -772,12 +801,21 @@ fun RegisterScreen(
 @Composable
 fun ForgotPasswordScreen(
     forgotPasswordState: RemoteDataState<Unit>,
+    forgotPinVerifyState: RemoteDataState<ForgotPasswordVerifyResponse> = RemoteDataState.Idle,
     onSubmitEmail: (String) -> Unit,
+    onVerifySecretPin: (String, String) -> Unit = { email, _ -> onSubmitEmail(email) },
+    onResetPasswordWithPin: (String, String, String, String) -> Unit = { email, _, _, _ -> onSubmitEmail(email) },
     onBackClick: () -> Unit,
     onOpenChecklist: () -> Unit
 ) {
     var email by rememberSaveable { mutableStateOf("") }
+    var secretPin by rememberSaveable { mutableStateOf("") }
+    var newPassword by rememberSaveable { mutableStateOf("") }
+    var confirmPassword by rememberSaveable { mutableStateOf("") }
     var localError by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val isPinVerified = forgotPinVerifyState is RemoteDataState.Success &&
+        forgotPinVerifyState.data.verified
 
     Column(
         modifier = Modifier
@@ -807,7 +845,7 @@ fun ForgotPasswordScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Enter the email address linked to your hanixurdu.com account. The PHP backend will dispatch a time-limited recovery link.",
+                        text = "Matches forgot_password.php: verify your registered Email + Secret Recovery PIN (`users.secret_pin`), then set a new password (minimum 8 characters).",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondarySilver
                     )
@@ -831,6 +869,67 @@ fun ForgotPasswordScreen(
                             .testTag("forgot_password_email_input")
                     )
 
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = secretPin,
+                        onValueChange = {
+                            secretPin = it
+                            localError = null
+                        },
+                        label = { Text("Secret Recovery PIN (from signup.php)") },
+                        leadingIcon = {
+                            Icon(Icons.Default.Key, contentDescription = "Secret PIN", tint = VipChampagneGold)
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        colors = hanixTextFieldColors(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("forgot_password_pin_input")
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = newPassword,
+                        onValueChange = {
+                            newPassword = it
+                            localError = null
+                        },
+                        label = { Text("New Password (min 8 chars — optional in step 1)") },
+                        leadingIcon = {
+                            Icon(Icons.Default.Lock, contentDescription = "New Password", tint = VipChampagneGold)
+                        },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        colors = hanixTextFieldColors(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("forgot_password_new_password_input")
+                    )
+
+                    if (newPassword.isNotBlank() || isPinVerified) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = confirmPassword,
+                            onValueChange = {
+                                confirmPassword = it
+                                localError = null
+                            },
+                            label = { Text("Confirm New Password") },
+                            leadingIcon = {
+                                Icon(Icons.Default.Lock, contentDescription = "Confirm Password", tint = VipChampagneGold)
+                            },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            colors = hanixTextFieldColors(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("forgot_password_confirm_password_input")
+                        )
+                    }
+
                     if (localError != null) {
                         Text(
                             text = localError.orEmpty(),
@@ -844,10 +943,30 @@ fun ForgotPasswordScreen(
 
                     Button(
                         onClick = {
-                            if (email.isBlank() || !email.contains("@")) {
-                                localError = "Please enter a valid email address."
-                            } else {
-                                onSubmitEmail(email)
+                            when {
+                                email.isBlank() || !email.contains("@") -> {
+                                    localError = "Please enter a valid email address."
+                                }
+                                newPassword.isNotBlank() && newPassword.length < 8 -> {
+                                    localError = "New password must be at least 8 characters."
+                                }
+                                newPassword.isNotBlank() && confirmPassword.isNotBlank() && newPassword != confirmPassword -> {
+                                    localError = "Passwords do not match."
+                                }
+                                newPassword.isNotBlank() && secretPin.isNotBlank() -> {
+                                    onResetPasswordWithPin(
+                                        email,
+                                        secretPin,
+                                        newPassword,
+                                        confirmPassword.ifBlank { newPassword }
+                                    )
+                                }
+                                secretPin.isNotBlank() -> {
+                                    onVerifySecretPin(email, secretPin)
+                                }
+                                else -> {
+                                    onSubmitEmail(email)
+                                }
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
@@ -859,7 +978,14 @@ fun ForgotPasswordScreen(
                             .height(50.dp)
                             .testTag("forgot_password_submit_button")
                     ) {
-                        Text("Send Recovery Request", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = when {
+                                newPassword.isNotBlank() -> "Reset Password with Secret PIN"
+                                secretPin.isNotBlank() -> "Verify Email & Secret PIN"
+                                else -> "Send Recovery Request"
+                            },
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -877,7 +1003,7 @@ fun ForgotPasswordScreen(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Password recovery instructions requested via POST /auth/forgot-password.",
+                            text = "Password recovery / reset completed via POST /auth/forgot-password.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextPrimaryIvory
                         )
@@ -886,7 +1012,20 @@ fun ForgotPasswordScreen(
             } else {
                 ContractStateBanner(
                     state = forgotPasswordState,
-                    onRetry = { if (email.isNotBlank()) onSubmitEmail(email) },
+                    onRetry = {
+                        if (email.isNotBlank()) {
+                            if (newPassword.isNotBlank() && secretPin.isNotBlank()) {
+                                onResetPasswordWithPin(
+                                    email,
+                                    secretPin,
+                                    newPassword,
+                                    confirmPassword.ifBlank { newPassword }
+                                )
+                            } else {
+                                onSubmitEmail(email)
+                            }
+                        }
+                    },
                     onOpenChecklist = onOpenChecklist
                 )
             }
