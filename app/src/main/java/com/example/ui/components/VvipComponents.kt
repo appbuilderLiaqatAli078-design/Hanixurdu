@@ -948,13 +948,29 @@ fun Cinema3DButton(
             .shadow(elevation = 6.dp, shape = shape, spotColor = Color.Black.copy(alpha = 0.6f))
             .clip(shape)
             .background(Brush.verticalGradient(gradientColors))
-            .border(width = 1.dp, color = highlightColor.copy(alpha = 0.75f), shape = shape)
+            .border(width = 1.dp, color = highlightColor.copy(alpha = 0.5f), shape = shape)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(contentPadding)
             .testTag(testTag),
         contentAlignment = Alignment.Center
     ) {
+        // Glossy Highlight Layer
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.25f),
+                            Color.White.copy(alpha = 0.05f),
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.15f)
+                        )
+                    )
+                )
+        )
+
         Row(
+            modifier = Modifier.padding(contentPadding),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
@@ -966,7 +982,7 @@ fun Cinema3DButton(
                 text = text,
                 color = textColor,
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

@@ -825,96 +825,123 @@ private fun EpisodeCardItem(
             .clickable {
                 if (isLocked) onUnlockVipClick() else onPlayClick()
             }
+            .shadow(4.dp, RoundedCornerShape(12.dp), spotColor = Color.Black.copy(alpha = 0.5f))
             .testTag("episode_card_${episode.id}"),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF131620)),
-        border = BorderStroke(1.dp, Color(0xFF222634))
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF181C26)),
+        border = BorderStroke(1.dp, Brush.verticalGradient(listOf(Color(0xFF3D445A), Color(0xFF131620))))
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            // Thumbnail with subtle rounded border
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Subtle Glossy Overlay
             Box(
                 modifier = Modifier
-                    .width(118.dp)
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF1C202C)),
-                contentAlignment = Alignment.Center
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.White.copy(alpha = 0.03f), Color.Transparent)
+                        )
+                    )
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                if (!episode.resolvedPoster.isNullOrBlank()) {
-                    AsyncImage(
-                        model = episode.resolvedPoster,
-                        contentDescription = episode.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = Color(0xFF555C70),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                if (isLocked) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.5f)),
-                        contentAlignment = Alignment.Center
-                    ) {
+                // Thumbnail with subtle rounded border
+                Box(
+                    modifier = Modifier
+                        .width(118.dp)
+                        .aspectRatio(16f / 9f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF0F1116))
+                        .border(1.dp, Color(0xFF2C3140), RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (!episode.resolvedPoster.isNullOrBlank()) {
+                        AsyncImage(
+                            model = episode.resolvedPoster,
+                            contentDescription = episode.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
                         Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = "VIP Locked",
-                            tint = VipChampagneGold,
-                            modifier = Modifier.size(20.dp)
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color(0xFF555C70),
+                            modifier = Modifier.size(24.dp)
                         )
                     }
+                    if (isLocked) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.6f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "VIP Locked",
+                                tint = VipChampagneGold,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
-            }
 
-            // Episode title in center
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = episode.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (isVip) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                // Episode title in center
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (isUserVip) "👑 VIP Unlocked" else "🔒 VIP Only",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isUserVip) EmeraldVerified else VipChampagneGold,
-                        fontWeight = FontWeight.SemiBold
+                        text = episode.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (isVip) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Surface(
+                            color = if (isUserVip) EmeraldVerified.copy(alpha = 0.15f) else VipChampagneGold.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(4.dp),
+                            border = BorderStroke(0.5.dp, if (isUserVip) EmeraldVerified else VipChampagneGold)
+                        ) {
+                            Text(
+                                text = if (isUserVip) "👑 VIP UNLOCKED" else "🔒 VIP ONLY",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isUserVip) EmeraldVerified else VipChampagneGold,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Circular Play Button on the right (3D Style)
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .shadow(6.dp, CircleShape, spotColor = if (isLocked) VipChampagneGold else Color.Black)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.verticalGradient(
+                                if (isLocked) listOf(Color(0xFF443D2A), Color(0xFF1A160D))
+                                else listOf(Color(0xFF3D445A), Color(0xFF131620))
+                            )
+                        )
+                        .border(1.dp, if (isLocked) VipChampagneGold.copy(alpha = 0.6f) else Color(0xFF5A637C), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.PlayArrow,
+                        contentDescription = "Play",
+                        tint = if (isLocked) VipChampagneGold else Color.White,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
-            }
-
-            // Circular Play Button on the right (matching screenshot)
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .shadow(3.dp, CircleShape)
-                    .clip(CircleShape)
-                    .background(Color(0xFF272C3B))
-                    .border(1.dp, Color(0xFF3D445A), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.PlayArrow,
-                    contentDescription = "Play",
-                    tint = if (isLocked) VipChampagneGold else Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
             }
         }
     }
@@ -1484,28 +1511,90 @@ fun VideoPlayerScreen(
                                             val autoPlayScript = """
                                                 (function() {
                                                     var attempts = 0;
+                                                    var maxAttempts = 150;
                                                     function triggerAutoPlayback() {
                                                         try {
-                                                            var covers = document.querySelectorAll('.vjs-poster, #poster, .art-player-cover, .plyr__poster, .video-poster, .poster-img');
-                                                            covers.forEach(function(c) { c.style.display = 'none'; });
                                                             var vids = document.querySelectorAll('video');
                                                             vids.forEach(function(v) {
                                                                 v.autoplay = true;
                                                                 v.muted = true;
                                                                 v.setAttribute('playsinline', 'true');
-                                                                var p = v.play();
-                                                                if (p !== undefined) {
-                                                                    p.then(function() {
-                                                                        setTimeout(function() { v.muted = false; }, 600);
+                                                                v.setAttribute('muted', 'true');
+                                                                v.setAttribute('autoplay', 'true');
+                                                                if (v.paused) {
+                                                                    v.play().then(function() {
+                                                                        setTimeout(function() { 
+                                                                            v.muted = false; 
+                                                                            v.volume = 1.0;
+                                                                        }, 1800);
                                                                     }).catch(function() {
                                                                         v.muted = true;
                                                                         v.play();
                                                                     });
                                                                 }
+                                                                // Aggressive interaction simulation
+                                                                if (attempts < 20) {
+                                                                    v.click();
+                                                                    v.focus();
+                                                                }
                                                             });
-                                                            var playBtns = document.querySelectorAll('#play-btn, .play-btn, .vjs-big-play-button, .plyr__control--overlaid, .jw-display-icon-container, [aria-label="Play"], .art-icon-play');
-                                                            playBtns.forEach(function(b) {
-                                                                try { b.click(); } catch(e) {}
+                                                            
+                                                            // Hide all possible poster/loading elements that block interaction
+                                                            var covers = document.querySelectorAll('.vjs-poster, #poster, .art-player-cover, .plyr__poster, .video-poster, .poster-img, .loading-screen, .big-play-button, .player-poster, .ytp-cued-thumbnail-overlay');
+                                                            covers.forEach(function(c) { 
+                                                                c.style.display = 'none'; 
+                                                                c.style.opacity = '0'; 
+                                                                c.style.pointerEvents = 'none';
+                                                            });
+
+                                                            var playSelectors = [
+                                                                '#play-btn', '.play-btn', '.vjs-big-play-button', '.plyr__control--overlaid',
+                                                                '.jw-display-icon-container', '[aria-label="Play"]', '.art-icon-play',
+                                                                '.play-button', '.play-icon', '.vjs-play-control', '.plyr__play-large',
+                                                                '.video-overlay-play', '.video-play-button', '.ytp-large-play-button',
+                                                                '.player-play', '.bitmovinplayer-poster', '.vjs-play-button', '.ytp-play-button',
+                                                                '.playbutton', '.play_button', '.play-btn-round', '.play-center', '.play-overlay'
+                                                            ];
+                                                            
+                                                            playSelectors.forEach(function(sel) {
+                                                                var btns = document.querySelectorAll(sel);
+                                                                btns.forEach(function(b) {
+                                                                    try {
+                                                                        if (b.offsetWidth > 0 || b.offsetHeight > 0) {
+                                                                            b.click();
+                                                                            b.dispatchEvent(new MouseEvent('mousedown', {bubbles:true}));
+                                                                            b.dispatchEvent(new MouseEvent('mouseup', {bubbles:true}));
+                                                                            b.dispatchEvent(new MouseEvent('click', {bubbles:true, cancelable:true}));
+                                                                            b.dispatchEvent(new TouchEvent('touchstart', {bubbles:true}));
+                                                                            b.dispatchEvent(new TouchEvent('touchend', {bubbles:true}));
+                                                                        }
+                                                                    } catch(e) {}
+                                                                });
+                                                            });
+
+                                                            // Generic search for elements containing "play" in class or ID
+                                                            var allTags = document.querySelectorAll('div, button, i, span, svg');
+                                                            allTags.forEach(function(el) {
+                                                                var name = (el.className || '').toString().toLowerCase() + (el.id || '').toString().toLowerCase();
+                                                                if (name.indexOf('play') !== -1 && name.indexOf('player') === -1 && (el.offsetWidth > 0 || el.offsetHeight > 0)) {
+                                                                    try {
+                                                                        el.click();
+                                                                        el.dispatchEvent(new MouseEvent('click', {bubbles:true}));
+                                                                    } catch(e) {}
+                                                                }
+                                                            });
+                                                            
+                                                            if (attempts % 5 === 0) {
+                                                                document.body.click();
+                                                                window.dispatchEvent(new Event('click'));
+                                                            }
+                                                            
+                                                            var iframes = document.querySelectorAll('iframe');
+                                                            iframes.forEach(function(f) {
+                                                                try { 
+                                                                    f.click();
+                                                                    f.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+                                                                } catch(e) {}
                                                             });
                                                         } catch(e) {}
                                                     }
@@ -1514,8 +1603,8 @@ fun VideoPlayerScreen(
                                                     triggerAutoPlayback();
                                                     var itv = setInterval(function() {
                                                         triggerAutoPlayback();
-                                                        if (attempts++ > 10) clearInterval(itv);
-                                                    }, 1500);
+                                                        if (attempts++ > maxAttempts) clearInterval(itv);
+                                                    }, 600);
                                                 })();
                                             """.trimIndent()
                                             view?.evaluateJavascript(isolatePlayerJs, null)
@@ -1581,29 +1670,77 @@ fun VideoPlayerScreen(
                                             )
                                             val autoPlayJs = """
                                                 (function() {
+                                                    var attempts = 0;
+                                                    var maxAttempts = 150;
                                                     function triggerPlayback() {
-                                                        var videos = document.getElementsByTagName('video');
-                                                        for (var i = 0; i < videos.length; i++) {
-                                                            var v = videos[i];
-                                                            v.autoplay = true;
-                                                            v.playsInline = true;
-                                                            var p = v.play();
-                                                            if (p !== undefined) {
-                                                                p.catch(function(e) {
-                                                                    v.muted = true;
-                                                                    v.play();
-                                                                });
+                                                        try {
+                                                            var videos = document.getElementsByTagName('video');
+                                                            for (var i = 0; i < videos.length; i++) {
+                                                                var v = videos[i];
+                                                                v.autoplay = true;
+                                                                v.playsInline = true;
+                                                                v.muted = true;
+                                                                v.setAttribute('muted', 'true');
+                                                                v.setAttribute('autoplay', 'true');
+                                                                v.setAttribute('playsinline', 'true');
+                                                                if (v.paused) {
+                                                                    v.play().then(function(){
+                                                                        setTimeout(function(){ 
+                                                                            v.muted = false; 
+                                                                            v.volume = 1.0;
+                                                                        }, 1800);
+                                                                    }).catch(function(e) {
+                                                                        v.muted = true;
+                                                                        v.play();
+                                                                    });
+                                                                }
+                                                                if (attempts < 20) v.click();
                                                             }
-                                                        }
-                                                        var playButtons = document.querySelectorAll('.vjs-big-play-button, #play-btn, .play-button, .jw-display-icon-container, button[aria-label="Play"], .plyr__control--overlaid');
-                                                        for (var j = 0; j < playButtons.length; j++) {
-                                                            try { playButtons[j].click(); } catch(e){}
-                                                        }
+                                                            var playSelectors = [
+                                                                '.vjs-big-play-button', '#play-btn', '.play-button', '.jw-display-icon-container',
+                                                                'button[aria-label="Play"]', '.plyr__control--overlaid', '.art-icon-play',
+                                                                '.play-icon', '.vjs-play-control', '.video-overlay-play', '.player-play',
+                                                                '.vjs-play-button', '.ytp-large-play-button', '.plyr__play-large',
+                                                                '.playbutton', '.play_button', '.play-btn-round', '.play-center', '.play-overlay'
+                                                            ];
+                                                            playSelectors.forEach(function(sel) {
+                                                                var btns = document.querySelectorAll(sel);
+                                                                for (var j = 0; j < btns.length; j++) {
+                                                                    try {
+                                                                        var b = btns[j];
+                                                                        if (b.offsetWidth > 0 || b.offsetHeight > 0) {
+                                                                            b.click();
+                                                                            b.dispatchEvent(new MouseEvent('mousedown', {bubbles:true}));
+                                                                            b.dispatchEvent(new MouseEvent('mouseup', {bubbles:true}));
+                                                                            b.dispatchEvent(new MouseEvent('click', {bubbles:true}));
+                                                                            b.dispatchEvent(new TouchEvent('touchstart', {bubbles:true}));
+                                                                            b.dispatchEvent(new TouchEvent('touchend', {bubbles:true}));
+                                                                        }
+                                                                    } catch(e){}
+                                                                }
+                                                            });
+
+                                                            // Generic search
+                                                            var allTags = document.querySelectorAll('div, button, i, span, svg');
+                                                            allTags.forEach(function(el) {
+                                                                var name = (el.className || '').toString().toLowerCase() + (el.id || '').toString().toLowerCase();
+                                                                if (name.indexOf('play') !== -1 && name.indexOf('player') === -1 && (el.offsetWidth > 0 || el.offsetHeight > 0)) {
+                                                                    try {
+                                                                        el.click();
+                                                                        el.dispatchEvent(new MouseEvent('click', {bubbles:true}));
+                                                                    } catch(e) {}
+                                                                }
+                                                            });
+                                                            if (attempts % 5 === 0) {
+                                                                document.body.click();
+                                                            }
+                                                        } catch(e) {}
                                                     }
                                                     triggerPlayback();
-                                                    setTimeout(triggerPlayback, 400);
-                                                    setTimeout(triggerPlayback, 1200);
-                                                    setTimeout(triggerPlayback, 2500);
+                                                    var itv = setInterval(function(){
+                                                        triggerPlayback();
+                                                        if(attempts++ > maxAttempts) clearInterval(itv);
+                                                    }, 600);
                                                 })();
                                             """.trimIndent()
                                             view?.evaluateJavascript(autoPlayJs, null)
@@ -1929,57 +2066,81 @@ fun VideoPlayerScreen(
                         ) {
                             Surface(
                                 onClick = { triggerSeekDelta(-10_000L) },
-                                color = OledBlack.copy(alpha = 0.75f),
+                                color = Color.Transparent,
                                 shape = CircleShape,
-                                border = BorderStroke(1.dp, VipChampagneGold.copy(alpha = 0.8f)),
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(52.dp)
                                     .testTag("moviebox_rewind_10s_button")
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .shadow(8.dp, CircleShape, spotColor = Color.Black)
+                                        .background(Brush.verticalGradient(listOf(Color(0xFF3D445A), Color(0xFF131620))))
+                                        .border(1.5.dp, Color(0xFF5A637C).copy(alpha = 0.6f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Icon(
                                         imageVector = Icons.Default.FastRewind,
                                         contentDescription = "Rewind 10 seconds",
                                         tint = TextPrimaryIvory,
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(26.dp)
                                     )
                                 }
                             }
 
                             Surface(
                                 onClick = { togglePlayPauseAction() },
-                                color = CinemaCrimson,
+                                color = Color.Transparent,
                                 shape = CircleShape,
-                                border = BorderStroke(2.dp, VipChampagneGold),
                                 modifier = Modifier
-                                    .size(62.dp)
+                                    .size(72.dp)
                                     .testTag("moviebox_play_pause_button")
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .shadow(10.dp, CircleShape, spotColor = CinemaCrimson)
+                                        .background(Brush.verticalGradient(listOf(Color(0xFFFF3344), Color(0xFF8B0000))))
+                                        .border(2.dp, VipChampagneGold, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // Subtle Glow
+                                    Box(
+                                        modifier = Modifier
+                                            .size(50.dp)
+                                            .background(Color.White.copy(alpha = 0.1f), CircleShape)
+                                    )
                                     Icon(
                                         imageVector = if (isCurrentlyPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                         contentDescription = if (isCurrentlyPlaying) "Pause" else "Play",
                                         tint = Color.White,
-                                        modifier = Modifier.size(34.dp)
+                                        modifier = Modifier.size(38.dp)
                                     )
                                 }
                             }
 
                             Surface(
                                 onClick = { triggerSeekDelta(10_000L) },
-                                color = OledBlack.copy(alpha = 0.75f),
+                                color = Color.Transparent,
                                 shape = CircleShape,
-                                border = BorderStroke(1.dp, VipChampagneGold.copy(alpha = 0.8f)),
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(52.dp)
                                     .testTag("moviebox_forward_10s_button")
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .shadow(8.dp, CircleShape, spotColor = Color.Black)
+                                        .background(Brush.verticalGradient(listOf(Color(0xFF3D445A), Color(0xFF131620))))
+                                        .border(1.5.dp, Color(0xFF5A637C).copy(alpha = 0.6f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Icon(
                                         imageVector = Icons.Default.FastForward,
                                         contentDescription = "Forward 10 seconds",
                                         tint = TextPrimaryIvory,
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(26.dp)
                                     )
                                 }
                             }
@@ -2260,31 +2421,6 @@ fun VideoPlayerScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 1. Multi-Server Switching Row (3D Cinema Style)
-                item {
-                    val serverList = if (availableServers.isNotEmpty()) availableServers else listOf(
-                        PlaybackServerDto(id = "main", label = "Main Server", type = "webpage", url = "")
-                    )
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(serverList, key = { it.id }) { server ->
-                            val isSelected = selectedServerKey == server.id || (selectedServerKey.isBlank() && server.id == "main")
-                            Cinema3DButton(
-                                text = server.label,
-                                onClick = {
-                                    selectedServerKey = server.id
-                                    onSwitchServer(server)
-                                },
-                                variant = if (isSelected) Cinema3DButtonVariant.Crimson else Cinema3DButtonVariant.Dark,
-                                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 12.dp),
-                                shape = RoundedCornerShape(10.dp),
-                                testTag = "server_switch_${server.id}"
-                            )
-                        }
-                    }
-                }
 
                 // 2. 3D Download via WhatsApp Button & Caption
                 item {
@@ -2627,22 +2763,40 @@ fun VideoPlayerScreen(
         }
 
         if (!isFullscreen) {
-            FloatingChatButton(
+            Box(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, bottom = 24.dp),
-                onClick = {
-                    runCatching {
-                        val intent = Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse("https://wa.me/923160450074?text=Assalam-o-Alaikum%20HaniX%20Urdu%20Support")
-                        )
-                        context.startActivity(intent)
+                    .padding(start = 16.dp, bottom = 24.dp)
+            ) {
+                FloatingChatButton(
+                    onClick = {
+                        runCatching {
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://wa.me/923160450074?text=Assalam-o-Alaikum%20HaniX%20Urdu%20Support")
+                            )
+                            context.startActivity(intent)
+                        }
                     }
-                }
-            )
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 24.dp)
+            ) {
+                FloatingMindGamesPill(
+                    onClick = {
+                        runCatching {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://hanixurdu.com/mind-games/"))
+                            context.startActivity(intent)
+                        }
+                    }
+                )
+            }
+        }
     }
-}
 }
 
 
@@ -2685,7 +2839,7 @@ private fun buildResponsivePlayerHtml(streamUrl: String, isDirectVideoFile: Bool
             </style>
         </head>
         <body oncontextmenu="return false;">
-            <video src="$safeUrl" controls autoplay playsinline preload="auto" controlsList="nodownload"></video>
+            <video src="$safeUrl" controls autoplay muted playsinline preload="auto" controlsList="nodownload"></video>
         </body>
         </html>
         """.trimIndent()
