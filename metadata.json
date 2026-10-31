@@ -1,0 +1,6 @@
+{
+  "name": "HaniX Urdu",
+  "description": "Premium native Android streaming & entertainment client for HaniX Urdu connected to Hostinger PHP + MySQL REST API and Bunny Stream HLS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
