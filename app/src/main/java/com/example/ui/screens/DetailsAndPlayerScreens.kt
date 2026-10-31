@@ -69,6 +69,8 @@ import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -2389,10 +2391,8 @@ fun VideoPlayerScreen(
 
                 if (playbackAuthState is RemoteDataState.Error) {
                     item {
-                        Card(
-                            colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = CharcoalSurface),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, CinemaCrimson.copy(alpha = 0.5f)),
+                        VvipGlassCard(
+                            borderColor = CinemaCrimson.copy(alpha = 0.5f),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(
