@@ -511,11 +511,11 @@ fun HomeScreen(
                         }
                     }
 
-                    // Latest Standalone Movies / Episodes (`run_video.php`)
+                    // Latest Standalone Dramas / Episodes (`run_video.php`)
                     if (!payload.latestMovies.isNullOrEmpty()) {
                         item {
                             WebsiteCategoryRail(
-                                title = "Latest Episodes & Movies",
+                                title = "Trending Dramas & Episodes",
                                 items = payload.latestMovies,
                                 isLandscape = false,
                                 keyPrefix = "lat",

@@ -1357,32 +1357,59 @@ class HaniXLiveWebsiteBridge(
                 }
             }
 
-            // Always ensure a Server 2 option and Direct Web Player option are available
             val directWebPlayerUrl = "$siteRoot/run_video.php?id=${encodeUrlParam(cleanedId)}"
-            if (servers.size == 1) {
-                val primary = servers.first()
-                // Provide an embed-mode Server 2 if Main Server is direct MP4/HLS, or Direct Web Player as Server 2
-                if (primary.type == "direct" || primary.type == "hls") {
-                    servers.add(
+
+            // Consolidate servers so Main Server is guaranteed to work via responsive web stream engine
+            val finalServers = mutableListOf<PlaybackServerDto>()
+
+            // 1. Main Server (HD): Connected to the reliable live web stream engine (fixes black screen / no audio)
+            finalServers.add(
+                PlaybackServerDto(
+                    id = "main",
+                    label = "Main Server (HD)",
+                    type = "webpage",
+                    url = directWebPlayerUrl
+                )
+            )
+
+            // 2. Add any extracted alternate stream servers
+            var altIndex = 2
+            for (candidate in servers) {
+                if (candidate.url.isNotBlank() && candidate.url != directWebPlayerUrl) {
+                    finalServers.add(
                         PlaybackServerDto(
-                            id = "server2",
-                            label = "Server 2 (Web Stream)",
-                            type = "embed",
-                            url = primary.url
+                            id = "server$altIndex",
+                            label = if (candidate.label.contains("Main", ignoreCase = true)) "Server $altIndex (Fast)" else candidate.label,
+                            type = candidate.type,
+                            url = candidate.url
                         )
                     )
+                    altIndex++
                 }
             }
-            if (servers.none { it.id == "webplayer" }) {
-                servers.add(
+
+            if (finalServers.size == 1) {
+                finalServers.add(
                     PlaybackServerDto(
-                        id = "webplayer",
-                        label = "Direct Web Player",
+                        id = "server2",
+                        label = "Server 2 (Backup)",
                         type = "webpage",
                         url = directWebPlayerUrl
                     )
                 )
             }
+
+            finalServers.add(
+                PlaybackServerDto(
+                    id = "webplayer",
+                    label = "Direct Web Player",
+                    type = "webpage",
+                    url = directWebPlayerUrl
+                )
+            )
+
+            servers.clear()
+            servers.addAll(finalServers)
 
             val isVipMarkedInHtml = html.contains("""id="vip-section" style="display: block""", ignoreCase = true) ||
                 html.contains("const isMoviePremium = true", ignoreCase = true)

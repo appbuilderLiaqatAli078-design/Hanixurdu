@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -78,10 +79,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -1100,7 +1104,25 @@ fun VideoPlayerScreen(
     var showControlsOverlay by rememberSaveable { mutableStateOf(true) }
     var showSpeedPicker by rememberSaveable { mutableStateOf(false) }
     var showEpisodeDrawer by rememberSaveable { mutableStateOf(false) }
+    var showDownloadDialog by rememberSaveable { mutableStateOf(false) }
+    var isWebPlaying by rememberSaveable { mutableStateOf(true) }
     var selectedQualityTier by rememberSaveable { mutableStateOf("720p") }
+
+    // Auto-hide player controls overlay after 3.5 seconds of playback
+    LaunchedEffect(showControlsOverlay, isPlaying, isWebPlaying, isScreenLocked) {
+        if (showControlsOverlay && !isScreenLocked) {
+            val currentlyPlaying = if (bunnyState is BunnyPlaybackState.ReadyToPlay &&
+                (bunnyState as BunnyPlaybackState.ReadyToPlay).playbackType in listOf("webpage", "embed")) {
+                isWebPlaying
+            } else {
+                isPlaying
+            }
+            if (currentlyPlaying) {
+                delay(3500L)
+                showControlsOverlay = false
+            }
+        }
+    }
 
     // 0 = Fit, 1 = Fill, 2 = Zoom
     var resizeModeIndex by rememberSaveable { mutableIntStateOf(0) }
@@ -1236,6 +1258,26 @@ fun VideoPlayerScreen(
         )
         activeGestureBadge = "📐 Aspect: ${when (resizeModeIndex) { 1 -> "Fill"; 2 -> "Zoom"; else -> "Fit" }}"
         gestureTriggerTick++
+    }
+
+    val isCurrentlyPlaying = if (bunnyState is BunnyPlaybackState.ReadyToPlay &&
+        (bunnyState as BunnyPlaybackState.ReadyToPlay).playbackType in listOf("webpage", "embed")) {
+        isWebPlaying
+    } else {
+        isPlaying
+    }
+
+    fun togglePlayPauseAction() {
+        if (bunnyState is BunnyPlaybackState.ReadyToPlay &&
+            (bunnyState as BunnyPlaybackState.ReadyToPlay).playbackType in listOf("webpage", "embed")) {
+            isWebPlaying = !isWebPlaying
+            activeWebViewRef?.evaluateJavascript(
+                "(function(){ var v = document.querySelector('video'); if(v){ if(v.paused) v.play(); else v.pause(); } })();",
+                null
+            )
+        } else {
+            playerManager.togglePlayPause()
+        }
     }
 
     Column(
@@ -1449,63 +1491,61 @@ fun VideoPlayerScreen(
                         )
                     }
 
-                    // MovieBox Gesture & Control Layer (Brightness Left Swipe, Volume Right Swipe, Double-Tap -10s/+10s)
-                    if (current.playbackType != "embed" && current.playbackType != "webpage") {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .pointerInput(isScreenLocked) {
-                                    detectTapGestures(
-                                        onTap = {
-                                            showControlsOverlay = !showControlsOverlay
-                                        },
-                                        onDoubleTap = { offset ->
-                                            if (!isScreenLocked) {
-                                                if (offset.x < size.width / 2f) {
-                                                    triggerSeekDelta(-10_000L)
-                                                } else {
-                                                    triggerSeekDelta(10_000L)
-                                                }
-                                            }
-                                        }
-                                    )
-                                }
-                                .pointerInput(isScreenLocked) {
-                                    var dragStartX = 0f
-                                    detectVerticalDragGestures(
-                                        onDragStart = { startOffset ->
-                                            dragStartX = startOffset.x
-                                        },
-                                        onVerticalDrag = { change, dragAmount ->
-                                            if (isScreenLocked) return@detectVerticalDragGestures
-                                            change.consume()
-                                            val deltaFraction = (-dragAmount / size.height.coerceAtLeast(1)).coerceIn(-0.15f, 0.15f)
-                                            if (dragStartX < size.width / 2f) {
-                                                // Left side: Brightness
-                                                brightnessLevel = (brightnessLevel + deltaFraction).coerceIn(0.05f, 1.0f)
-                                                activity?.window?.let { win ->
-                                                    val lp = win.attributes
-                                                    lp.screenBrightness = brightnessLevel
-                                                    win.attributes = lp
-                                                }
-                                                activeGestureBadge = "☀️ Brightness ${(brightnessLevel * 100).roundToInt()}%"
-                                                gestureTriggerTick++
+                    // Gesture & Control Layer (Universal: Works on Web Stream and Media3)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(isScreenLocked) {
+                                detectTapGestures(
+                                    onTap = {
+                                        showControlsOverlay = !showControlsOverlay
+                                    },
+                                    onDoubleTap = { offset ->
+                                        if (!isScreenLocked) {
+                                            if (offset.x < size.width / 2f) {
+                                                triggerSeekDelta(-10_000L)
                                             } else {
-                                                // Right side: Volume
-                                                volumeLevel = (volumeLevel + deltaFraction).coerceIn(0.0f, 1.0f)
-                                                audioManager?.let { am ->
-                                                    val maxV = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-                                                    val targetV = (volumeLevel * maxV).roundToInt().coerceIn(0, maxV)
-                                                    am.setStreamVolume(AudioManager.STREAM_MUSIC, targetV, 0)
-                                                }
-                                                activeGestureBadge = "🔊 Volume ${(volumeLevel * 100).roundToInt()}%"
-                                                gestureTriggerTick++
+                                                triggerSeekDelta(10_000L)
                                             }
                                         }
-                                    )
-                                }
-                        )
-                    }
+                                    }
+                                )
+                            }
+                            .pointerInput(isScreenLocked) {
+                                var dragStartX = 0f
+                                detectVerticalDragGestures(
+                                    onDragStart = { startOffset ->
+                                        dragStartX = startOffset.x
+                                    },
+                                    onVerticalDrag = { change, dragAmount ->
+                                        if (isScreenLocked) return@detectVerticalDragGestures
+                                        change.consume()
+                                        val deltaFraction = (-dragAmount / size.height.coerceAtLeast(1)).coerceIn(-0.15f, 0.15f)
+                                        if (dragStartX < size.width / 2f) {
+                                            // Left side: Brightness
+                                            brightnessLevel = (brightnessLevel + deltaFraction).coerceIn(0.05f, 1.0f)
+                                            activity?.window?.let { win ->
+                                                val lp = win.attributes
+                                                lp.screenBrightness = brightnessLevel
+                                                win.attributes = lp
+                                            }
+                                            activeGestureBadge = "☀️ Brightness ${(brightnessLevel * 100).roundToInt()}%"
+                                            gestureTriggerTick++
+                                        } else {
+                                            // Right side: Volume
+                                            volumeLevel = (volumeLevel + deltaFraction).coerceIn(0.0f, 1.0f)
+                                            audioManager?.let { am ->
+                                                val maxV = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                                                val targetV = (volumeLevel * maxV).roundToInt().coerceIn(0, maxV)
+                                                am.setStreamVolume(AudioManager.STREAM_MUSIC, targetV, 0)
+                                            }
+                                            activeGestureBadge = "🔊 Volume ${(volumeLevel * 100).roundToInt()}%"
+                                            gestureTriggerTick++
+                                        }
+                                    }
+                                )
+                            }
+                    )
 
                     // Center Gesture Feedback Pill (Brightness / Volume / Seek / Speed / Aspect Ratio)
                     androidx.compose.animation.AnimatedVisibility(
@@ -1529,11 +1569,11 @@ fun VideoPlayerScreen(
                         }
                     }
 
-                    // MovieBox Top Floating Control Strip (Lock, Speed, Aspect Ratio, Episodes Drawer, Fullscreen)
+                    // Floating Screen Lock / Unlock Pill
                     if (isScreenLocked) {
                         Surface(
                             onClick = { isScreenLocked = false },
-                            color = OledBlack.copy(alpha = 0.8f),
+                            color = OledBlack.copy(alpha = 0.85f),
                             shape = RoundedCornerShape(50),
                             border = BorderStroke(1.dp, VipChampagneGold),
                             modifier = Modifier
@@ -1561,121 +1601,227 @@ fun VideoPlayerScreen(
                             }
                         }
                     } else if (showControlsOverlay) {
-                        // Top-right MovieBox quick actions bar inside viewport
+                        // Semi-transparent cinema overlay scrim
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.40f))
+                        )
+
+                        // Top bar controls (Title, Episode Drawer, Speed, Aspect, Lock, Fullscreen)
                         Row(
                             modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(8.dp)
-                                .background(OledBlack.copy(alpha = 0.72f), RoundedCornerShape(50))
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                .align(Alignment.TopCenter)
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (isFullscreen) {
-                                IconButton(
-                                    onClick = { isFullscreen = false },
-                                    modifier = Modifier.size(32.dp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (isFullscreen) {
+                                    IconButton(
+                                        onClick = { isFullscreen = false },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                            contentDescription = "Exit Fullscreen",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                }
+                                Surface(
+                                    color = OledBlack.copy(alpha = 0.72f),
+                                    shape = RoundedCornerShape(50),
+                                    border = BorderStroke(1.dp, VipChampagneGold.copy(alpha = 0.5f))
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = "Exit Fullscreen",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
+                                    Text(
+                                        text = "HaniX HD Player",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = VipGoldLight,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
                                 }
                             }
 
-                            // Rewind -10s button
-                            IconButton(
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (episodesList.isNotEmpty()) {
+                                    Surface(
+                                        onClick = { showEpisodeDrawer = !showEpisodeDrawer },
+                                        color = CharcoalSurface,
+                                        shape = RoundedCornerShape(50),
+                                        border = BorderStroke(1.dp, CinemaCrimson),
+                                        modifier = Modifier.testTag("moviebox_drawer_button")
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.VideoLibrary, contentDescription = null, tint = CinemaCrimson, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "EP",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Speed selector pill
+                                Surface(
+                                    onClick = { showSpeedPicker = !showSpeedPicker },
+                                    color = CharcoalSurface,
+                                    shape = RoundedCornerShape(50),
+                                    border = BorderStroke(1.dp, VipChampagneGold.copy(alpha = 0.6f)),
+                                    modifier = Modifier.testTag("moviebox_speed_button")
+                                ) {
+                                    Text(
+                                        text = "${playbackSpeed}x",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = VipGoldLight,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+
+                                // Aspect Ratio pill
+                                Surface(
+                                    onClick = { cycleAspectRatio() },
+                                    color = CharcoalSurface,
+                                    shape = RoundedCornerShape(50),
+                                    border = BorderStroke(1.dp, GlassBorderSubtle),
+                                    modifier = Modifier.testTag("moviebox_aspect_ratio_button")
+                                ) {
+                                    Text(
+                                        text = resizeModeLabel,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextPrimaryIvory,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+
+                                // Lock screen button
+                                IconButton(
+                                    onClick = { isScreenLocked = true },
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .testTag("moviebox_lock_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.LockOpen,
+                                        contentDescription = "Lock Player Controls",
+                                        tint = VipChampagneGold,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
+                                // Fullscreen toggle button
+                                IconButton(
+                                    onClick = { isFullscreen = !isFullscreen },
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .testTag("moviebox_fullscreen_button")
+                                ) {
+                                    Icon(
+                                        imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                                        contentDescription = "Toggle Fullscreen",
+                                        tint = VipChampagneGold,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Center Play/Pause & Seek Controls (Rewind -10s, Big Play/Pause, Forward +10s)
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .testTag("moviebox_center_controls"),
+                            horizontalArrangement = Arrangement.spacedBy(24.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
                                 onClick = { triggerSeekDelta(-10_000L) },
+                                color = OledBlack.copy(alpha = 0.75f),
+                                shape = CircleShape,
+                                border = BorderStroke(1.dp, VipChampagneGold.copy(alpha = 0.8f)),
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(48.dp)
                                     .testTag("moviebox_rewind_10s_button")
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.FastRewind,
-                                    contentDescription = "Rewind 10 seconds",
-                                    tint = TextPrimaryIvory,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.FastRewind,
+                                        contentDescription = "Rewind 10 seconds",
+                                        tint = TextPrimaryIvory,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
                             }
 
-                            // Forward +10s button
-                            IconButton(
-                                onClick = { triggerSeekDelta(10_000L) },
+                            Surface(
+                                onClick = { togglePlayPauseAction() },
+                                color = CinemaCrimson,
+                                shape = CircleShape,
+                                border = BorderStroke(2.dp, VipChampagneGold),
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(62.dp)
+                                    .testTag("moviebox_play_pause_button")
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = if (isCurrentlyPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                        contentDescription = if (isCurrentlyPlaying) "Pause" else "Play",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(34.dp)
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                onClick = { triggerSeekDelta(10_000L) },
+                                color = OledBlack.copy(alpha = 0.75f),
+                                shape = CircleShape,
+                                border = BorderStroke(1.dp, VipChampagneGold.copy(alpha = 0.8f)),
+                                modifier = Modifier
+                                    .size(48.dp)
                                     .testTag("moviebox_forward_10s_button")
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.FastForward,
-                                    contentDescription = "Forward 10 seconds",
-                                    tint = TextPrimaryIvory,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.FastForward,
+                                        contentDescription = "Forward 10 seconds",
+                                        tint = TextPrimaryIvory,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
                             }
+                        }
 
-                            // Speed selector pill
+                        // Bottom position row
+                        if (durationMs > 0L) {
                             Surface(
-                                onClick = { showSpeedPicker = !showSpeedPicker },
-                                color = CharcoalSurface,
-                                shape = RoundedCornerShape(50),
-                                border = BorderStroke(1.dp, VipChampagneGold.copy(alpha = 0.6f)),
-                                modifier = Modifier.testTag("moviebox_speed_button")
-                            ) {
-                                Text(
-                                    text = "${playbackSpeed}x",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = VipGoldLight,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-
-                            // Aspect Ratio pill
-                            Surface(
-                                onClick = { cycleAspectRatio() },
-                                color = CharcoalSurface,
+                                color = OledBlack.copy(alpha = 0.72f),
                                 shape = RoundedCornerShape(50),
                                 border = BorderStroke(1.dp, GlassBorderSubtle),
-                                modifier = Modifier.testTag("moviebox_aspect_ratio_button")
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(10.dp)
                             ) {
                                 Text(
-                                    text = resizeModeLabel,
+                                    text = "${formatDurationMs(currentPosMs)} / ${formatDurationMs(durationMs)}",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = TextPrimaryIvory,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-
-                            // Lock screen button
-                            IconButton(
-                                onClick = { isScreenLocked = true },
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .testTag("moviebox_lock_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.LockOpen,
-                                    contentDescription = "Lock Player Controls",
-                                    tint = VipChampagneGold,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
-                            // Fullscreen toggle button
-                            IconButton(
-                                onClick = { isFullscreen = !isFullscreen },
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .testTag("moviebox_fullscreen_button")
-                            ) {
-                                Icon(
-                                    imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-                                    contentDescription = "Toggle Fullscreen",
-                                    tint = VipChampagneGold,
-                                    modifier = Modifier.size(20.dp)
+                                    color = TextSecondarySilver,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                 )
                             }
                         }
@@ -1944,304 +2090,18 @@ fun VideoPlayerScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // 1. MovieBox Control Dock (Seek, Speed, Aspect Ratio, Brightness/Volume Sliders, Lock, Fullscreen, Episodes Drawer)
+                // 1. Drama Header & Compact Action Bar
                 item {
+                    val dramaTitle = episodesList.find { it.id == contentId }?.title
+                        ?: if (contentType.equals("series", ignoreCase = true)) "Drama Series" else "Drama #$contentId"
+
                     VvipGlassCard(
-                        borderColor = VipChampagneGold.copy(alpha = 0.65f),
-                        modifier = Modifier.testTag("moviebox_control_dock")
+                        borderColor = VipChampagneGold.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("player_info_card")
                     ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "🎬 MovieBox Pro Controls",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = VipChampagneGold,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Surface(
-                                    color = EmeraldVerified.copy(alpha = 0.16f),
-                                    shape = RoundedCornerShape(50),
-                                    border = BorderStroke(1.dp, EmeraldVerified.copy(alpha = 0.7f))
-                                ) {
-                                    Text(
-                                        text = "🎥 Video Record OK • 🔇 Audio Copy Blocked",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = EmeraldVerified,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Quick action buttons row: -10s, Play/Pause, +10s, Speed, Aspect, Lock, Fullscreen
-                            LazyRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                item {
-                                    OutlinedButton(
-                                        onClick = { triggerSeekDelta(-10_000L) },
-                                        border = BorderStroke(1.dp, GlassBorderSubtle),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                                    ) {
-                                        Icon(Icons.Default.FastRewind, contentDescription = null, tint = TextPrimaryIvory, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("-10s", color = TextPrimaryIvory, style = MaterialTheme.typography.labelSmall)
-                                    }
-                                }
-                                item {
-                                    Button(
-                                        onClick = {
-                                            playerManager.togglePlayPause()
-                                            activeWebViewRef?.evaluateJavascript(
-                                                "(function(){ var v = document.querySelector('video'); if(v){ if(v.paused) v.play(); else v.pause(); } })();",
-                                                null
-                                            )
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = CinemaCrimson,
-                                            contentColor = Color.White
-                                        ),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = if (isPlaying) "Pause" else "Play",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                }
-                                item {
-                                    OutlinedButton(
-                                        onClick = { triggerSeekDelta(10_000L) },
-                                        border = BorderStroke(1.dp, GlassBorderSubtle),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                                    ) {
-                                        Icon(Icons.Default.FastForward, contentDescription = null, tint = TextPrimaryIvory, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("+10s", color = TextPrimaryIvory, style = MaterialTheme.typography.labelSmall)
-                                    }
-                                }
-                                item {
-                                    OutlinedButton(
-                                        onClick = {
-                                            val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
-                                            val nextIdx = (speeds.indexOf(playbackSpeed) + 1) % speeds.size
-                                            applySpeedToAllPlayers(speeds[nextIdx])
-                                        },
-                                        border = BorderStroke(1.dp, VipChampagneGold),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                                    ) {
-                                        Icon(Icons.Default.Speed, contentDescription = null, tint = VipChampagneGold, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Speed ${playbackSpeed}x", color = VipGoldLight, style = MaterialTheme.typography.labelSmall)
-                                    }
-                                }
-                                item {
-                                    OutlinedButton(
-                                        onClick = { cycleAspectRatio() },
-                                        border = BorderStroke(1.dp, GlassBorderSubtle),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                                    ) {
-                                        Icon(Icons.Default.AspectRatio, contentDescription = null, tint = TextPrimaryIvory, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Ratio: $resizeModeLabel", color = TextPrimaryIvory, style = MaterialTheme.typography.labelSmall)
-                                    }
-                                }
-                                item {
-                                    OutlinedButton(
-                                        onClick = { isScreenLocked = !isScreenLocked },
-                                        border = BorderStroke(1.dp, if (isScreenLocked) VipChampagneGold else GlassBorderSubtle),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isScreenLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-                                            contentDescription = null,
-                                            tint = VipChampagneGold,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = if (isScreenLocked) "Locked" else "Lock",
-                                            color = VipGoldLight,
-                                            style = MaterialTheme.typography.labelSmall
-                                        )
-                                    }
-                                }
-                                item {
-                                    Button(
-                                        onClick = { isFullscreen = !isFullscreen },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = VipChampagneGold,
-                                            contentColor = OledBlack
-                                        ),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                                    ) {
-                                        Icon(Icons.Default.Fullscreen, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Fullscreen", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                                if (episodesList.isNotEmpty()) {
-                                    item {
-                                        OutlinedButton(
-                                            onClick = { showEpisodeDrawer = !showEpisodeDrawer },
-                                            border = BorderStroke(1.dp, CinemaCrimson),
-                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                                        ) {
-                                            Icon(Icons.Default.VideoLibrary, contentDescription = null, tint = CinemaCrimson, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("Episodes (${episodesList.size})", color = TextPrimaryIvory, style = MaterialTheme.typography.labelSmall)
-                                        }
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            // Interactive Brightness & Volume Sliders (mirrors vertical swipe gestures)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    modifier = Modifier.weight(1f),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.BrightnessHigh,
-                                        contentDescription = "Brightness",
-                                        tint = VipChampagneGold,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Slider(
-                                        value = brightnessLevel,
-                                        onValueChange = { newVal ->
-                                            brightnessLevel = newVal
-                                            activity?.window?.let { win ->
-                                                val lp = win.attributes
-                                                lp.screenBrightness = newVal
-                                                win.attributes = lp
-                                            }
-                                        },
-                                        colors = SliderDefaults.colors(
-                                            thumbColor = VipChampagneGold,
-                                            activeTrackColor = VipChampagneGold
-                                        ),
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-
-                                Row(
-                                    modifier = Modifier.weight(1f),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-                                        contentDescription = "Volume",
-                                        tint = CinemaCrimson,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Slider(
-                                        value = volumeLevel,
-                                        onValueChange = { newVol ->
-                                            volumeLevel = newVol
-                                            audioManager?.let { am ->
-                                                val maxV = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-                                                val targetV = (newVol * maxV).roundToInt().coerceIn(0, maxV)
-                                                am.setStreamVolume(AudioManager.STREAM_MUSIC, targetV, 0)
-                                            }
-                                        },
-                                        colors = SliderDefaults.colors(
-                                            thumbColor = CinemaCrimson,
-                                            activeTrackColor = CinemaCrimson
-                                        ),
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-                            }
-
-                            if (durationMs > 0L) {
-                                Text(
-                                    text = "Position: ${formatDurationMs(currentPosMs)} / ${formatDurationMs(durationMs)}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = TextSecondarySilver
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // 2. Multi-Server Switching Bar (Main Server / Server 2 / Direct Web Player)
-                if (availableServers.isNotEmpty()) {
-                    item {
-                        VvipGlassCard(borderColor = CinemaCrimson.copy(alpha = 0.65f)) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.CloudQueue,
-                                        contentDescription = null,
-                                        tint = CinemaCrimson,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Switch Video Server (Instant Fallback)",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = TextPrimaryIvory,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(10.dp))
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    items(availableServers, key = { it.id }) { server ->
-                                        val isSelected = selectedServerKey == server.id
-                                        FilterChip(
-                                            selected = isSelected,
-                                            onClick = {
-                                                selectedServerKey = server.id
-                                                onSwitchServer(server)
-                                            },
-                                            label = {
-                                                Text(
-                                                    text = "▶ ${server.label}",
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            },
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = CinemaCrimson,
-                                                selectedLabelColor = Color.White,
-                                                containerColor = CharcoalSurface,
-                                                labelColor = TextPrimaryIvory
-                                            ),
-                                            modifier = Modifier.testTag("server_switch_${server.id}")
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 3. App-Private Offline Vault Download (Hidden from Gallery via .nomedia + AES-256-GCM)
-                item {
-                    VvipGlassCard(borderColor = VipChampagneGold.copy(alpha = 0.55f)) {
-                        Column(modifier = Modifier.padding(14.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -2249,70 +2109,120 @@ fun VideoPlayerScreen(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "🔒 App-Private Offline Download (No Gallery Save)",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = VipGoldLight,
-                                        fontWeight = FontWeight.Bold
+                                        text = dramaTitle,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = TextPrimaryIvory,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
+                                    Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "Saves strictly inside HaniX Private Vault (AES-256-GCM + .nomedia). Never appears in phone Gallery.",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = TextSecondarySilver
+                                        text = "Urdu Dubbed • 1080p Ultra HD • HaniX Official",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextMutedSlate
+                                    )
+                                }
+
+                                Surface(
+                                    color = if (payload?.requiresVip == true) VipChampagneGold.copy(alpha = 0.18f) else EmeraldVerified.copy(alpha = 0.18f),
+                                    shape = RoundedCornerShape(50),
+                                    border = BorderStroke(1.dp, if (payload?.requiresVip == true) VipChampagneGold else EmeraldVerified)
+                                ) {
+                                    Text(
+                                        text = if (payload?.requiresVip == true) "VIP ONLY" else "FREE HD",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (payload?.requiresVip == true) VipGoldLight else EmeraldVerified,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            // Sleek Action Buttons Row: [Download HD], [Episodes], [WhatsApp Support], [VIP Plans]
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                listOf("360p", "720p", "1080p").forEach { tier ->
-                                    val selected = selectedQualityTier == tier
-                                    FilterChip(
-                                        selected = selected,
-                                        onClick = { selectedQualityTier = tier },
-                                        label = { Text(tier, fontWeight = FontWeight.Bold) },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = VipChampagneGold,
-                                            selectedLabelColor = OledBlack,
-                                            containerColor = CharcoalSurface,
-                                            labelColor = TextPrimaryIvory
-                                        )
-                                    )
-                                }
-                                Spacer(modifier = Modifier.weight(1f))
                                 Button(
-                                    onClick = {
-                                        onDownloadCurrentMedia(contentType, contentId, selectedQualityTier)
-                                    },
+                                    onClick = { showDownloadDialog = true },
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = VipChampagneGold,
-                                        contentColor = OledBlack
+                                        containerColor = CinemaCrimson,
+                                        contentColor = Color.White
                                     ),
-                                    modifier = Modifier.testTag("player_private_vault_download_button")
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                                    modifier = Modifier
+                                        .weight(1.2f)
+                                        .testTag("player_private_vault_download_button")
                                 ) {
                                     Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Save ($selectedQualityTier)", fontWeight = FontWeight.Bold)
+                                    Text("Download", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                }
+
+                                if (episodesList.isNotEmpty()) {
+                                    OutlinedButton(
+                                        onClick = { showEpisodeDrawer = true },
+                                        border = BorderStroke(1.dp, GlassBorderSubtle),
+                                        shape = RoundedCornerShape(10.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.VideoLibrary, contentDescription = null, tint = TextPrimaryIvory, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Episodes", color = TextPrimaryIvory, style = MaterialTheme.typography.labelMedium)
+                                    }
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        runCatching {
+                                            val intent = Intent(
+                                                Intent.ACTION_VIEW,
+                                                Uri.parse("https://wa.me/923160450074?text=Assalam-o-Alaikum%20HaniX%20Urdu%2C%20I%20need%20help%20with%20$contentType%20%23$contentId")
+                                            )
+                                            context.startActivity(intent)
+                                        }
+                                    },
+                                    border = BorderStroke(1.dp, EmeraldVerified.copy(alpha = 0.7f)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                    modifier = Modifier.testTag("player_whatsapp_download_button")
+                                ) {
+                                    Icon(Icons.Default.SupportAgent, contentDescription = "WhatsApp", tint = EmeraldVerified, modifier = Modifier.size(16.dp))
+                                }
+
+                                OutlinedButton(
+                                    onClick = onNavigateToVip,
+                                    border = BorderStroke(1.dp, VipChampagneGold.copy(alpha = 0.7f)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(Icons.Default.WorkspacePremium, contentDescription = "VIP", tint = VipChampagneGold, modifier = Modifier.size(16.dp))
                                 }
                             }
 
                             if (downloadActionState is RemoteDataState.Success) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "✓ Saved in App-Private Offline Vault (${downloadActionState.data.title}) — Hidden from Gallery.",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = EmeraldVerified,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Surface(
+                                    color = EmeraldVerified.copy(alpha = 0.12f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, EmeraldVerified.copy(alpha = 0.4f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "✓ Saved in App-Private Offline Vault (${downloadActionState.data.title}) — Hidden from Gallery.",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = EmeraldVerified,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
                             } else if (downloadActionState is RemoteDataState.Error) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = downloadActionState.message,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = AmberPending
-                                )
-                            } else if (downloadActionState is RemoteDataState.AuthRequired) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = downloadActionState.message,
@@ -2324,39 +2234,128 @@ fun VideoPlayerScreen(
                     }
                 }
 
-                // 4. WhatsApp Support & VIP Plans Row
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                runCatching {
-                                    val intent = Intent(
-                                        Intent.ACTION_VIEW,
-                                        Uri.parse("https://wa.me/923160450074?text=Assalam-o-Alaikum%20HaniX%20Urdu%2C%20I%20need%20help%20with%20$contentType%20%23$contentId")
+                // 2. Multi-Server Switching Row (Main Server / Server 2 / Direct Web Player)
+                if (availableServers.isNotEmpty()) {
+                    item {
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudQueue,
+                                        contentDescription = null,
+                                        tint = VipChampagneGold,
+                                        modifier = Modifier.size(16.dp)
                                     )
-                                    context.startActivity(intent)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Select Server",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = VipChampagneGold,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
-                            },
-                            border = BorderStroke(1.dp, EmeraldVerified),
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("player_whatsapp_download_button")
-                        ) {
-                            Icon(Icons.Default.SupportAgent, contentDescription = null, tint = EmeraldVerified, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("WhatsApp Support", color = EmeraldVerified, style = MaterialTheme.typography.labelMedium)
+                                Text(
+                                    text = "Auto-connected to HD Web Stream",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextMutedSlate
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(availableServers, key = { it.id }) { server ->
+                                    val isSelected = selectedServerKey == server.id
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = {
+                                            selectedServerKey = server.id
+                                            onSwitchServer(server)
+                                        },
+                                        label = {
+                                            Text(
+                                                text = server.label,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                style = MaterialTheme.typography.labelMedium
+                                            )
+                                        },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = CinemaCrimson,
+                                            selectedLabelColor = Color.White,
+                                            containerColor = CharcoalSurface,
+                                            labelColor = TextPrimaryIvory
+                                        ),
+                                        border = FilterChipDefaults.filterChipBorder(
+                                            enabled = true,
+                                            selected = isSelected,
+                                            borderColor = if (isSelected) VipChampagneGold else GlassBorderSubtle
+                                        ),
+                                        modifier = Modifier.testTag("server_switch_${server.id}")
+                                    )
+                                }
+                            }
                         }
-                        OutlinedButton(
-                            onClick = onNavigateToVip,
-                            border = BorderStroke(1.dp, VipChampagneGold),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = VipChampagneGold, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("VIP Plans", color = VipGoldLight, style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+
+                // 3. Episodes Rail (if series/episodes are available)
+                if (episodesList.isNotEmpty()) {
+                    item {
+                        Column {
+                            Text(
+                                text = "Episodes (${episodesList.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = VipChampagneGold,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(episodesList, key = { "ep_rail_${it.id}" }) { ep ->
+                                    val cleanId = ep.id.removePrefix("vip_locked_")
+                                    val isCurrent = cleanId == contentId
+                                    val epLocked = ep.resolvedIsVip && !isUserVip
+                                    Surface(
+                                        onClick = {
+                                            if (epLocked) {
+                                                onNavigateToVip()
+                                            } else if (!isCurrent) {
+                                                onSelectEpisodeFromDrawer(cleanId)
+                                            }
+                                        },
+                                        color = if (isCurrent) CinemaCrimson else CharcoalSurface,
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = BorderStroke(1.dp, if (isCurrent) VipChampagneGold else GlassBorderSubtle),
+                                        modifier = Modifier.widthIn(min = 68.dp)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Text(
+                                                text = if (ep.title.startsWith("Episode", ignoreCase = true)) ep.title else "EP ${ep.id}",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = Color.White,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            if (epLocked) {
+                                                Text(
+                                                    text = "VIP",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = VipGoldLight,
+                                                    fontWeight = FontWeight.ExtraBold
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -2415,6 +2414,134 @@ fun VideoPlayerScreen(
                                     Text("Retry Playback", fontWeight = FontWeight.Bold)
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Sleek Offline Download Quality Selection Dialog (1080p, 720p, 360p)
+        if (showDownloadDialog) {
+            Dialog(onDismissRequest = { showDownloadDialog = false }) {
+                VvipGlassCard(
+                    borderColor = VipChampagneGold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp)
+                        .testTag("download_quality_dialog")
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Download,
+                                    contentDescription = null,
+                                    tint = VipChampagneGold,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Download Drama",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = VipChampagneGold,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            IconButton(
+                                onClick = { showDownloadDialog = false },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close",
+                                    tint = TextSecondarySilver,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Saved in HaniX Private Vault (.nomedia + AES-256). Hidden from phone Gallery.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondarySilver,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        listOf(
+                            Triple("1080p", "1080p Full HD", "Best crystal-clear quality"),
+                            Triple("720p", "720p HD", "Standard high definition"),
+                            Triple("360p", "360p Data Saver", "Fastest download & low storage")
+                        ).forEach { (tier, title, desc) ->
+                            val isSelected = selectedQualityTier == tier
+                            Surface(
+                                onClick = { selectedQualityTier = tier },
+                                color = if (isSelected) CinemaCrimson.copy(alpha = 0.22f) else CharcoalSurface,
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, if (isSelected) VipChampagneGold else GlassBorderSubtle),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = isSelected,
+                                        onClick = { selectedQualityTier = tier },
+                                        colors = RadioButtonDefaults.colors(
+                                            selectedColor = VipChampagneGold,
+                                            unselectedColor = TextSecondarySilver
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = title,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = TextPrimaryIvory,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = desc,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = TextMutedSlate
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Button(
+                            onClick = {
+                                showDownloadDialog = false
+                                onDownloadCurrentMedia(contentType, contentId, selectedQualityTier)
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = CinemaCrimson,
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("confirm_download_button")
+                        ) {
+                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Download ($selectedQualityTier)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
