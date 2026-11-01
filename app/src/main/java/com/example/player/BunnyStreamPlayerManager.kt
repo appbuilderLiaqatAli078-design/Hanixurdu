@@ -158,6 +158,44 @@ class BunnyStreamPlayerManager(private val context: Context) {
      * Validates the PHP backend's `PlaybackAuthorizationPayload` and prepares Media3 ExoPlayer (for `hls`/`direct`)
      * or signals `ReadyToPlay(..., playbackType = "embed" | "webpage")` (for embedded YouTube/Drive/Rumble/Server 2/Web Player links).
      */
+    private fun getOrCreatePlayer(): ExoPlayer {
+        val existing = exoPlayer
+        if (existing != null) return existing
+
+        val newPlayer = ExoPlayer.Builder(context)
+            .setAudioAttributes(HaniXSecurityShield.buildProtectedMedia3AudioAttributes(), true)
+            .build()
+        
+        newPlayer.addListener(object : Player.Listener {
+            override fun onIsPlayingChanged(isPlayingNow: Boolean) {
+                _isPlaying.value = isPlayingNow
+                _currentPositionMs.value = newPlayer.currentPosition.coerceAtLeast(0L)
+                _durationMs.value = newPlayer.duration.coerceAtLeast(0L)
+            }
+
+            override fun onPlaybackStateChanged(state: Int) {
+                _currentPositionMs.value = newPlayer.currentPosition.coerceAtLeast(0L)
+                _durationMs.value = newPlayer.duration.coerceAtLeast(0L)
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                // Automatically fall back to the WebView HTML5 / Embed player if ExoPlayer fails
+                val currentState = _playbackState.value
+                if (currentState is BunnyPlaybackState.ReadyToPlay) {
+                    releasePlayer()
+                    _playbackState.value = currentState.copy(playbackType = "embed")
+                }
+            }
+        })
+        
+        exoPlayer = newPlayer
+        return newPlayer
+    }
+
+    /**
+     * Validates the PHP backend's `PlaybackAuthorizationPayload` and prepares Media3 ExoPlayer (for `hls`/`direct`)
+     * or signals `ReadyToPlay(..., playbackType = "embed" | "webpage")` (for embedded YouTube/Drive/Rumble/Server 2/Web Player links).
+     */
     @OptIn(UnstableApi::class)
     fun initializeFromBackendAuthorization(
         payload: PlaybackAuthorizationPayload,
@@ -171,7 +209,7 @@ class BunnyStreamPlayerManager(private val context: Context) {
             return null
         }
 
-        releasePlayer()
+        // We update the state but DO NOT release the player if we are going to reuse it
         _playbackState.value = validatedState
 
         // If the selected server is an iframe embed or Direct Web Player,
@@ -180,6 +218,7 @@ class BunnyStreamPlayerManager(private val context: Context) {
             validatedState.playbackType == "embed" ||
             validatedState.playbackType == "webpage"
         ) {
+            releasePlayer()
             return null
         }
 
@@ -203,38 +242,19 @@ class BunnyStreamPlayerManager(private val context: Context) {
 
         HaniXSecurityShield.enforceAudioCaptureBlock(context)
 
-        val player = ExoPlayer.Builder(context)
-            .setAudioAttributes(HaniXSecurityShield.buildProtectedMedia3AudioAttributes(), true)
-            .build().apply {
-                setMediaSource(mediaSource)
-                setPlaybackSpeed(_playbackSpeed.value)
-                prepare()
-                val resumeMs = payload.resumePositionMs ?: 0L
-                if (resumeMs > 0L) {
-                    seekTo(resumeMs)
-                }
-                playWhenReady = true
-                addListener(object : Player.Listener {
-                    override fun onIsPlayingChanged(isPlayingNow: Boolean) {
-                        _isPlaying.value = isPlayingNow
-                        _currentPositionMs.value = currentPosition.coerceAtLeast(0L)
-                        _durationMs.value = duration.coerceAtLeast(0L)
-                    }
+        val player = getOrCreatePlayer()
+        // Reusing the same instance: setMediaSource replaces current items.
+        // We don't call stop() to avoid unnecessary surface clearing.
+        player.setMediaSource(mediaSource)
+        player.setPlaybackSpeed(_playbackSpeed.value)
+        player.prepare()
+        
+        val resumeMs = payload.resumePositionMs ?: 0L
+        if (resumeMs > 0L) {
+            player.seekTo(resumeMs)
+        }
+        player.playWhenReady = true
 
-                    override fun onPlaybackStateChanged(state: Int) {
-                        _currentPositionMs.value = currentPosition.coerceAtLeast(0L)
-                        _durationMs.value = duration.coerceAtLeast(0L)
-                    }
-
-                    override fun onPlayerError(error: PlaybackException) {
-                        // Automatically fall back to the WebView HTML5 / Embed player if ExoPlayer fails on a direct/redirected URL
-                        releasePlayer()
-                        _playbackState.value = validatedState.copy(playbackType = "embed")
-                    }
-                })
-            }
-
-        exoPlayer = player
         return player
     }
 

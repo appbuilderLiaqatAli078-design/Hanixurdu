@@ -169,13 +169,6 @@ private fun Context.findActivity(): Activity? {
     return null
 }
 
-class WebAppInterface(private val onToggle: () -> Unit) {
-    @JavascriptInterface
-    fun toggleControls() {
-        onToggle()
-    }
-}
-
 // =========================================================================
 // 11. MOVIE DETAILS SCREEN
 // =========================================================================
@@ -777,43 +770,54 @@ fun SeriesDetailsScreen(
             }
         }
     }
-}
 
-        // Floating WhatsApp Follow Pill & Chat button over the screen
-        if (showWhatsAppFollow) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 80.dp)
-            ) {
-                WhatsAppFollowPill(
-                    onFollowClick = {
-                        runCatching {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://whatsapp.com/channel/0029Va9Wk684Spk9jV5JzQ0y"))
-                            context.startActivity(intent)
-                        }
-                    },
-                    onDismissClick = { showWhatsAppFollow = false }
-                )
-            }
-        }
-
+    // Floating WhatsApp Follow Pill & Chat button over the screen
+    if (showWhatsAppFollow) {
         Box(
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 16.dp, bottom = 16.dp)
+                .fillMaxSize()
+                .padding(end = 16.dp, bottom = 80.dp),
+            contentAlignment = Alignment.BottomEnd
         ) {
-            FloatingChatButton(
-                onClick = {
+            WhatsAppFollowPill(
+                onFollowClick = {
                     runCatching {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/hanixurdu_support"))
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://whatsapp.com/channel/0029Va9Wk684Spk9jV5JzQ0y"))
                         context.startActivity(intent)
                     }
-                }
+                },
+                onDismissClick = { showWhatsAppFollow = false }
             )
         }
     }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = 16.dp, bottom = 16.dp),
+        contentAlignment = Alignment.BottomStart
+    ) {
+        FloatingChatButton(
+            onClick = {
+                runCatching {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/hanixurdu_support"))
+                    context.startActivity(intent)
+                }
+            }
+        )
+    }
 }
+}
+}
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1270,14 +1274,6 @@ fun VideoPlayerScreen(
     var gestureTriggerTick by remember { mutableIntStateOf(0) }
     var activeWebViewRef by remember { mutableStateOf<WebView?>(null) }
 
-    val webInterface = remember {
-        WebAppInterface {
-            activity?.runOnUiThread {
-                showControlsOverlay = !showControlsOverlay
-            }
-        }
-    }
-
     // Enforce Screen Record Allowed + Audio Capture Blocked on entry
     LaunchedEffect(activity) {
         if (activity != null) {
@@ -1397,30 +1393,8 @@ fun VideoPlayerScreen(
     }
 
     fun togglePlayPauseAction() {
-        if (bunnyState is BunnyPlaybackState.ReadyToPlay &&
-            (bunnyState as BunnyPlaybackState.ReadyToPlay).playbackType in listOf("webpage", "embed")) {
-            isWebPlaying = !isWebPlaying
-            val jsCmd = if (isWebPlaying) {
-                """
-                (function() {
-                    var v = document.querySelector('video');
-                    if (v) {
-                        v.play().catch(function() {
-                            v.muted = true;
-                            v.play().then(function() {
-                                setTimeout(function() { v.muted = false; }, 300);
-                            });
-                        });
-                    }
-                    var b = document.querySelector('.vjs-big-play-button') || document.querySelector('#play-btn');
-                    if (b) try { b.click(); } catch(e) {}
-                })();
-                """.trimIndent()
-            } else {
-                "(function(){ var v = document.querySelector('video'); if(v) v.pause(); })();"
-            }
-            activeWebViewRef?.evaluateJavascript(jsCmd, null)
-        } else {
+        if (bunnyState !is BunnyPlaybackState.ReadyToPlay ||
+            (bunnyState as BunnyPlaybackState.ReadyToPlay).playbackType !in listOf("webpage", "embed")) {
             playerManager.togglePlayPause()
         }
     }
@@ -1463,14 +1437,13 @@ fun VideoPlayerScreen(
                     val streamUrl = current.authorizedHlsUrl
                     val exoPlayer = playerManager.getPlayer()
 
-                    if (current.playbackType == "webpage") {
-                        // Direct Web Player with hardware acceleration and clean container
+                    if (current.playbackType == "webpage" || current.playbackType == "embed") {
+                        // Direct Web Player or Embed with hardware acceleration and clean container
                         val webHeaders = mapOf("Referer" to "https://hanixurdu.com/")
                         AndroidView(
                             factory = { ctx ->
                                 WebView(ctx).apply {
                                     activeWebViewRef = this
-                                    addJavascriptInterface(webInterface, "Android")
                                     setLayerType(View.LAYER_TYPE_HARDWARE, null)
                                     settings.javaScriptEnabled = true
                                     settings.domStorageEnabled = true
@@ -1523,112 +1496,7 @@ fun VideoPlayerScreen(
                                                     } catch(e) {}
                                                 })();
                                             """.trimIndent()
-                                            val autoPlayScript = """
-                                                (function() {
-                                                    var attempts = 0;
-                                                    var maxAttempts = 150;
-                                                    function triggerAutoPlayback() {
-                                                        try {
-                                                            var vids = document.querySelectorAll('video');
-                                                            vids.forEach(function(v) {
-                                                                v.autoplay = true;
-                                                                v.muted = true;
-                                                                v.setAttribute('playsinline', 'true');
-                                                                v.setAttribute('muted', 'true');
-                                                                v.setAttribute('autoplay', 'true');
-                                                                if (v.paused) {
-                                                                    v.play().then(function() {
-                                                                        setTimeout(function() { 
-                                                                            v.muted = false; 
-                                                                            v.volume = 1.0;
-                                                                        }, 1800);
-                                                                    }).catch(function() {
-                                                                        v.muted = true;
-                                                                        v.play();
-                                                                    });
-                                                                }
-                                                                // Aggressive interaction simulation
-                                                                if (attempts < 20) {
-                                                                    v.click();
-                                                                    v.focus();
-                                                                }
-                                                            });
-                                                            
-                                                            // Hide all possible poster/loading elements that block interaction
-                                                            var covers = document.querySelectorAll('.vjs-poster, #poster, .art-player-cover, .plyr__poster, .video-poster, .poster-img, .loading-screen, .big-play-button, .player-poster, .ytp-cued-thumbnail-overlay');
-                                                            covers.forEach(function(c) { 
-                                                                c.style.display = 'none'; 
-                                                                c.style.opacity = '0'; 
-                                                                c.style.pointerEvents = 'none';
-                                                            });
-
-                                                            var playSelectors = [
-                                                                '#play-btn', '.play-btn', '.vjs-big-play-button', '.plyr__control--overlaid',
-                                                                '.jw-display-icon-container', '[aria-label="Play"]', '.art-icon-play',
-                                                                '.play-button', '.play-icon', '.vjs-play-control', '.plyr__play-large',
-                                                                '.video-overlay-play', '.video-play-button', '.ytp-large-play-button',
-                                                                '.player-play', '.bitmovinplayer-poster', '.vjs-play-button', '.ytp-play-button',
-                                                                '.playbutton', '.play_button', '.play-btn-round', '.play-center', '.play-overlay'
-                                                            ];
-                                                            
-                                                            playSelectors.forEach(function(sel) {
-                                                                var btns = document.querySelectorAll(sel);
-                                                                btns.forEach(function(b) {
-                                                                    try {
-                                                                        if (b.offsetWidth > 0 || b.offsetHeight > 0 || attempts < 10) {
-                                                                            b.click();
-                                                                            b.focus();
-                                                                            ['mousedown', 'mouseup', 'click', 'touchstart', 'touchend'].forEach(function(ev) {
-                                                                                b.dispatchEvent(new MouseEvent(ev, {bubbles:true, cancelable:true, view:window}));
-                                                                                if (ev.startsWith('touch')) b.dispatchEvent(new TouchEvent(ev, {bubbles:true, cancelable:true}));
-                                                                            });
-                                                                        }
-                                                                    } catch(e) {}
-                                                                });
-                                                            });
-
-                                                            // Generic search for elements containing "play" in class or ID
-                                                            var allTags = document.querySelectorAll('div, button, i, span, svg');
-                                                            allTags.forEach(function(el) {
-                                                                var name = (el.className || '').toString().toLowerCase() + (el.id || '').toString().toLowerCase();
-                                                                if (name.indexOf('play') !== -1 && name.indexOf('player') === -1 && (el.offsetWidth > 0 || el.offsetHeight > 0)) {
-                                                                    try {
-                                                                        el.click();
-                                                                        el.dispatchEvent(new MouseEvent('click', {bubbles:true}));
-                                                                    } catch(e) {}
-                                                                }
-                                                            });
-                                                            
-                                                            if (attempts % 5 === 0) {
-                                                                document.body.click();
-                                                                window.dispatchEvent(new Event('click'));
-                                                            }
-                                                            
-                                                            var iframes = document.querySelectorAll('iframe');
-                                                            iframes.forEach(function(f) {
-                                                                try { 
-                                                                    f.click();
-                                                                    f.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-                                                                } catch(e) {}
-                                                            });
-                                                        } catch(e) {}
-                                                    }
-                                                    var observer = new MutationObserver(function() { triggerAutoPlayback(); });
-                                                    observer.observe(document.body, { childList: true, subtree: true });
-                                                    triggerAutoPlayback();
-                                                    var itv = setInterval(function() {
-                                                        triggerAutoPlayback();
-                                                        if (attempts++ > maxAttempts) clearInterval(itv);
-                                                    }, 300);
-
-                                                    // Toggle controls on click/tap
-                                                    document.addEventListener('click', function(e) {
-                                                        if (window.Android) window.Android.toggleControls();
-                                                    });
-                                                })();
-                                            """.trimIndent()
                                             view?.evaluateJavascript(isolatePlayerJs, null)
-                                            view?.evaluateJavascript(autoPlayScript, null)
                                             view?.evaluateJavascript(
                                                 HaniXSecurityShield.buildWebViewAudioAndLinkProtectionJs(),
                                                 null
@@ -1663,7 +1531,6 @@ fun VideoPlayerScreen(
                             factory = { ctx ->
                                 WebView(ctx).apply {
                                     activeWebViewRef = this
-                                    addJavascriptInterface(webInterface, "Android")
                                     setLayerType(View.LAYER_TYPE_HARDWARE, null)
                                     settings.javaScriptEnabled = true
                                     settings.domStorageEnabled = true
@@ -1689,87 +1556,6 @@ fun VideoPlayerScreen(
                                                 HaniXSecurityShield.buildWebViewAudioAndLinkProtectionJs(),
                                                 null
                                             )
-                                            val autoPlayJs = """
-                                                (function() {
-                                                    var attempts = 0;
-                                                    var maxAttempts = 150;
-                                                    function triggerPlayback() {
-                                                        try {
-                                                            var videos = document.getElementsByTagName('video');
-                                                            for (var i = 0; i < videos.length; i++) {
-                                                                var v = videos[i];
-                                                                v.autoplay = true;
-                                                                v.playsInline = true;
-                                                                v.muted = true;
-                                                                v.setAttribute('muted', 'true');
-                                                                v.setAttribute('autoplay', 'true');
-                                                                v.setAttribute('playsinline', 'true');
-                                                                if (v.paused) {
-                                                                    v.play().then(function(){
-                                                                        setTimeout(function(){ 
-                                                                            v.muted = false; 
-                                                                            v.volume = 1.0;
-                                                                        }, 1800);
-                                                                    }).catch(function(e) {
-                                                                        v.muted = true;
-                                                                        v.play();
-                                                                    });
-                                                                }
-                                                                if (attempts < 20) v.click();
-                                                            }
-                                                            var playSelectors = [
-                                                                '.vjs-big-play-button', '#play-btn', '.play-button', '.jw-display-icon-container',
-                                                                'button[aria-label="Play"]', '.plyr__control--overlaid', '.art-icon-play',
-                                                                '.play-icon', '.vjs-play-control', '.video-overlay-play', '.player-play',
-                                                                '.vjs-play-button', '.ytp-large-play-button', '.plyr__play-large',
-                                                                '.playbutton', '.play_button', '.play-btn-round', '.play-center', '.play-overlay'
-                                                            ];
-                                                            playSelectors.forEach(function(sel) {
-                                                                var btns = document.querySelectorAll(sel);
-                                                                for (var j = 0; j < btns.length; j++) {
-                                                                    try {
-                                                                        var b = btns[j];
-                                                                        if (b.offsetWidth > 0 || b.offsetHeight > 0) {
-                                                                            b.click();
-                                                                            b.dispatchEvent(new MouseEvent('mousedown', {bubbles:true}));
-                                                                            b.dispatchEvent(new MouseEvent('mouseup', {bubbles:true}));
-                                                                            b.dispatchEvent(new MouseEvent('click', {bubbles:true}));
-                                                                            b.dispatchEvent(new TouchEvent('touchstart', {bubbles:true}));
-                                                                            b.dispatchEvent(new TouchEvent('touchend', {bubbles:true}));
-                                                                        }
-                                                                    } catch(e){}
-                                                                }
-                                                            });
-
-                                                            // Generic search
-                                                            var allTags = document.querySelectorAll('div, button, i, span, svg');
-                                                            allTags.forEach(function(el) {
-                                                                var name = (el.className || '').toString().toLowerCase() + (el.id || '').toString().toLowerCase();
-                                                                if (name.indexOf('play') !== -1 && name.indexOf('player') === -1 && (el.offsetWidth > 0 || el.offsetHeight > 0)) {
-                                                                    try {
-                                                                        el.click();
-                                                                        el.dispatchEvent(new MouseEvent('click', {bubbles:true}));
-                                                                    } catch(e) {}
-                                                                }
-                                                            });
-                                                            if (attempts % 5 === 0) {
-                                                                document.body.click();
-                                                            }
-                                                        } catch(e) {}
-                                                    }
-                                                    triggerPlayback();
-                                                    var itv = setInterval(function(){
-                                                        triggerPlayback();
-                                                        if(attempts++ > maxAttempts) clearInterval(itv);
-                                                    }, 300);
-
-                                                    // Toggle controls on click/tap
-                                                    document.addEventListener('click', function(e) {
-                                                        if (window.Android) window.Android.toggleControls();
-                                                    });
-                                                })();
-                                            """.trimIndent()
-                                            view?.evaluateJavascript(autoPlayJs, null)
                                         }
                                     }
                                     tag = streamUrl
@@ -1813,13 +1599,19 @@ fun VideoPlayerScreen(
                         AndroidView(
                             factory = { ctx ->
                                 PlayerView(ctx).apply {
+                                    // Remove the black flicker by making the shutter transparent
+                                    // and keeping content when the player is reset/prepared.
+                                    setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
+                                    setKeepContentOnPlayerReset(true)
                                     player = exoPlayer
                                     useController = true
                                     resizeMode = exoResizeMode
                                 }
                             },
                             update = { view ->
-                                view.player = exoPlayer
+                                if (view.player != exoPlayer) {
+                                    view.player = exoPlayer
+                                }
                                 view.resizeMode = exoResizeMode
                             },
                             modifier = Modifier
@@ -1829,81 +1621,62 @@ fun VideoPlayerScreen(
                     }
 
                     // Gesture & Control Layer (Universal: Works on Web Stream and Media3)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .then(
-                                if (current.playbackType in listOf("webpage", "embed")) {
-                                    if (showControlsOverlay && !isScreenLocked) {
-                                        Modifier.clickable(
-                                            indication = null,
-                                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-                                        ) {
-                                            showControlsOverlay = false
-                                        }
-                                    } else {
-                                        Modifier
-                                    }
-                                } else {
-                                    Modifier.pointerInput(isScreenLocked) {
-                                        detectTapGestures(
-                                            onTap = {
-                                                showControlsOverlay = !showControlsOverlay
-                                            },
-                                            onDoubleTap = { offset ->
-                                                if (!isScreenLocked) {
-                                                    if (offset.x < size.width / 2f) {
-                                                        triggerSeekDelta(-10_000L)
-                                                    } else {
-                                                        triggerSeekDelta(10_000L)
-                                                    }
-                                                }
-                                            }
-                                        )
-                                    }
-                                }
-                            )
-                            .then(
-                                if (current.playbackType !in listOf("webpage", "embed") || (showControlsOverlay && !isScreenLocked)) {
-                                    Modifier.pointerInput(isScreenLocked) {
-                                        var dragStartX = 0f
-                                        detectVerticalDragGestures(
-                                            onDragStart = { startOffset ->
-                                                dragStartX = startOffset.x
-                                            },
-                                            onVerticalDrag = { change, dragAmount ->
-                                                if (isScreenLocked) return@detectVerticalDragGestures
-                                                change.consume()
-                                                val deltaFraction = (-dragAmount / size.height.coerceAtLeast(1)).coerceIn(-0.15f, 0.15f)
-                                                if (dragStartX < size.width / 2f) {
-                                                    // Left side: Brightness
-                                                    brightnessLevel = (brightnessLevel + deltaFraction).coerceIn(0.05f, 1.0f)
-                                                    activity?.window?.let { win ->
-                                                        val lp = win.attributes
-                                                        lp.screenBrightness = brightnessLevel
-                                                        win.attributes = lp
-                                                    }
-                                                    activeGestureBadge = "☀️ Brightness ${(brightnessLevel * 100).roundToInt()}%"
-                                                    gestureTriggerTick++
+                    if (current.playbackType !in listOf("webpage", "embed")) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(isScreenLocked) {
+                                    detectTapGestures(
+                                        onTap = {
+                                            showControlsOverlay = !showControlsOverlay
+                                        },
+                                        onDoubleTap = { offset ->
+                                            if (!isScreenLocked) {
+                                                if (offset.x < size.width / 2f) {
+                                                    triggerSeekDelta(-10_000L)
                                                 } else {
-                                                    // Right side: Volume
-                                                    volumeLevel = (volumeLevel + deltaFraction).coerceIn(0.0f, 1.0f)
-                                                    audioManager?.let { am ->
-                                                        val maxV = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-                                                        val targetV = (volumeLevel * maxV).roundToInt().coerceIn(0, maxV)
-                                                        am.setStreamVolume(AudioManager.STREAM_MUSIC, targetV, 0)
-                                                    }
-                                                    activeGestureBadge = "🔊 Volume ${(volumeLevel * 100).roundToInt()}%"
-                                                    gestureTriggerTick++
+                                                    triggerSeekDelta(10_000L)
                                                 }
                                             }
-                                        )
-                                    }
-                                } else {
-                                    Modifier
+                                        }
+                                    )
                                 }
-                            )
-                    )
+                                .pointerInput(isScreenLocked) {
+                                    var dragStartX = 0f
+                                    detectVerticalDragGestures(
+                                        onDragStart = { startOffset ->
+                                            dragStartX = startOffset.x
+                                        },
+                                        onVerticalDrag = { change, dragAmount ->
+                                            if (isScreenLocked) return@detectVerticalDragGestures
+                                            change.consume()
+                                            val deltaFraction = (-dragAmount / size.height.coerceAtLeast(1)).coerceIn(-0.15f, 0.15f)
+                                            if (dragStartX < size.width / 2f) {
+                                                // Left side: Brightness
+                                                brightnessLevel = (brightnessLevel + deltaFraction).coerceIn(0.05f, 1.0f)
+                                                activity?.window?.let { win ->
+                                                    val lp = win.attributes
+                                                    lp.screenBrightness = brightnessLevel
+                                                    win.attributes = lp
+                                                }
+                                                activeGestureBadge = "☀️ Brightness ${(brightnessLevel * 100).roundToInt()}%"
+                                                gestureTriggerTick++
+                                            } else {
+                                                // Right side: Volume
+                                                volumeLevel = (volumeLevel + deltaFraction).coerceIn(0.0f, 1.0f)
+                                                audioManager?.let { am ->
+                                                    val maxV = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                                                    val targetV = (volumeLevel * maxV).roundToInt().coerceIn(0, maxV)
+                                                    am.setStreamVolume(AudioManager.STREAM_MUSIC, targetV, 0)
+                                                }
+                                                activeGestureBadge = "🔊 Volume ${(volumeLevel * 100).roundToInt()}%"
+                                                gestureTriggerTick++
+                                            }
+                                        }
+                                    )
+                                }
+                        )
+                    }
 
                     // Center Gesture Feedback Pill (Brightness / Volume / Seek / Speed / Aspect Ratio)
                     androidx.compose.animation.AnimatedVisibility(
@@ -1958,8 +1731,8 @@ fun VideoPlayerScreen(
                                 )
                             }
                         }
-                    } else if (showControlsOverlay) {
-                        // Semi-transparent cinema overlay scrim
+                    } else if (showControlsOverlay && current.playbackType !in listOf("webpage", "embed")) {
+                        // Semi-transparent cinema overlay scrim (Only for Native)
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -2099,92 +1872,94 @@ fun VideoPlayerScreen(
                             }
                         }
 
-                        // Center Play/Pause & Seek Controls (Rewind -10s, Big Play/Pause, Forward +10s)
-                        Row(
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .testTag("moviebox_center_controls"),
-                            horizontalArrangement = Arrangement.spacedBy(24.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                onClick = { triggerSeekDelta(-10_000L) },
-                                color = Color.Transparent,
-                                shape = CircleShape,
+                        // Center Play/Pause & Seek Controls (Only for Native)
+                        if (current.playbackType !in listOf("webpage", "embed")) {
+                            Row(
                                 modifier = Modifier
-                                    .size(52.dp)
-                                    .testTag("moviebox_rewind_10s_button")
+                                    .align(Alignment.Center)
+                                    .testTag("moviebox_center_controls"),
+                                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(
+                                Surface(
+                                    onClick = { triggerSeekDelta(-10_000L) },
+                                    color = Color.Transparent,
+                                    shape = CircleShape,
                                     modifier = Modifier
-                                        .fillMaxSize()
-                                        .shadow(8.dp, CircleShape, spotColor = Color.Black)
-                                        .background(Brush.verticalGradient(listOf(Color(0xFF3D445A), Color(0xFF131620))))
-                                        .border(1.5.dp, Color(0xFF5A637C).copy(alpha = 0.6f), CircleShape),
-                                    contentAlignment = Alignment.Center
+                                        .size(52.dp)
+                                        .testTag("moviebox_rewind_10s_button")
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.FastRewind,
-                                        contentDescription = "Rewind 10 seconds",
-                                        tint = TextPrimaryIvory,
-                                        modifier = Modifier.size(26.dp)
-                                    )
-                                }
-                            }
-
-                            Surface(
-                                onClick = { togglePlayPauseAction() },
-                                color = Color.Transparent,
-                                shape = CircleShape,
-                                modifier = Modifier
-                                    .size(72.dp)
-                                    .testTag("moviebox_play_pause_button")
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .shadow(10.dp, CircleShape, spotColor = CinemaCrimson)
-                                        .background(Brush.verticalGradient(listOf(Color(0xFFFF3344), Color(0xFF8B0000))))
-                                        .border(2.dp, VipChampagneGold, CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    // Subtle Glow
                                     Box(
                                         modifier = Modifier
-                                            .size(50.dp)
-                                            .background(Color.White.copy(alpha = 0.1f), CircleShape)
-                                    )
-                                    Icon(
-                                        imageVector = if (isCurrentlyPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                        contentDescription = if (isCurrentlyPlaying) "Pause" else "Play",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(38.dp)
-                                    )
+                                            .fillMaxSize()
+                                            .shadow(8.dp, CircleShape, spotColor = Color.Black)
+                                            .background(Brush.verticalGradient(listOf(Color(0xFF3D445A), Color(0xFF131620))))
+                                            .border(1.5.dp, Color(0xFF5A637C).copy(alpha = 0.6f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.FastRewind,
+                                            contentDescription = "Rewind 10 seconds",
+                                            tint = TextPrimaryIvory,
+                                            modifier = Modifier.size(26.dp)
+                                        )
+                                    }
                                 }
-                            }
 
-                            Surface(
-                                onClick = { triggerSeekDelta(10_000L) },
-                                color = Color.Transparent,
-                                shape = CircleShape,
-                                modifier = Modifier
-                                    .size(52.dp)
-                                    .testTag("moviebox_forward_10s_button")
-                            ) {
-                                Box(
+                                Surface(
+                                    onClick = { togglePlayPauseAction() },
+                                    color = Color.Transparent,
+                                    shape = CircleShape,
                                     modifier = Modifier
-                                        .fillMaxSize()
-                                        .shadow(8.dp, CircleShape, spotColor = Color.Black)
-                                        .background(Brush.verticalGradient(listOf(Color(0xFF3D445A), Color(0xFF131620))))
-                                        .border(1.5.dp, Color(0xFF5A637C).copy(alpha = 0.6f), CircleShape),
-                                    contentAlignment = Alignment.Center
+                                        .size(72.dp)
+                                        .testTag("moviebox_play_pause_button")
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.FastForward,
-                                        contentDescription = "Forward 10 seconds",
-                                        tint = TextPrimaryIvory,
-                                        modifier = Modifier.size(26.dp)
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .shadow(10.dp, CircleShape, spotColor = CinemaCrimson)
+                                            .background(Brush.verticalGradient(listOf(Color(0xFFFF3344), Color(0xFF8B0000))))
+                                            .border(2.dp, VipChampagneGold, CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        // Subtle Glow
+                                        Box(
+                                            modifier = Modifier
+                                                .size(50.dp)
+                                                .background(Color.White.copy(alpha = 0.1f), CircleShape)
+                                        )
+                                        Icon(
+                                            imageVector = if (isCurrentlyPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                            contentDescription = if (isCurrentlyPlaying) "Pause" else "Play",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(38.dp)
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    onClick = { triggerSeekDelta(10_000L) },
+                                    color = Color.Transparent,
+                                    shape = CircleShape,
+                                    modifier = Modifier
+                                        .size(52.dp)
+                                        .testTag("moviebox_forward_10s_button")
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .shadow(8.dp, CircleShape, spotColor = Color.Black)
+                                            .background(Brush.verticalGradient(listOf(Color(0xFF3D445A), Color(0xFF131620))))
+                                            .border(1.5.dp, Color(0xFF5A637C).copy(alpha = 0.6f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.FastForward,
+                                            contentDescription = "Forward 10 seconds",
+                                            tint = TextPrimaryIvory,
+                                            modifier = Modifier.size(26.dp)
+                                        )
+                                    }
                                 }
                             }
                         }

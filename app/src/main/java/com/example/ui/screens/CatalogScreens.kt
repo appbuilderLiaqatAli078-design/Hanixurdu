@@ -28,6 +28,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -890,18 +892,25 @@ private fun HaniXHeroCoverflowSection(
     onAddToMyList: () -> Unit,
     onOpenVipModal: () -> Unit
 ) {
-    var activeIndex by rememberSaveable { mutableIntStateOf(0) }
-    val safeIndex = activeIndex.coerceIn(0, (banners.size - 1).coerceAtLeast(0))
-    val activeBanner = banners.getOrNull(safeIndex) ?: return
-    val prevIndex = if (safeIndex - 1 >= 0) safeIndex - 1 else banners.lastIndex
-    val nextIndex = if (safeIndex + 1 < banners.size) safeIndex + 1 else 0
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { banners.size })
+    
+    // Automatic rotation logic (4 seconds)
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(4000)
+            val nextPage = (pagerState.currentPage + 1) % banners.size
+            pagerState.animateScrollToPage(nextPage)
+        }
+    }
+
+    val activeBanner = banners.getOrNull(pagerState.currentPage) ?: return
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(410.dp)
     ) {
-        // Blurred dynamic background image (`#hero-bg` in `index.php`)
+        // Blurred dynamic background image
         val bgPoster = activeBanner.posterPath ?: activeBanner.backdropUrl
         if (!bgPoster.isNullOrBlank()) {
             AsyncImage(
@@ -915,7 +924,7 @@ private fun HaniXHeroCoverflowSection(
             )
         }
 
-        // Vignette gradient overlay (`linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, #0a0a0a 100%)`)
+        // Vignette gradient overlay
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -937,113 +946,37 @@ private fun HaniXHeroCoverflowSection(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // 3D Coverflow Stage (Left Card, Active Center Card, Right Card + Prev/Next Arrows)
-            Box(
+            // HorizontalPager for Automatic Drama Slider
+            HorizontalPager(
+                state = pagerState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(255.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                // Left Background Card (`prev` in `index.php`)
-                if (banners.size > 1) {
-                    val leftBanner = banners[prevIndex]
-                    CoverflowCardItem(
-                        banner = leftBanner,
-                        isActive = false,
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .padding(start = 24.dp)
-                            .width(128.dp)
-                            .height(190.dp)
-                            .graphicsLayer {
-                                scaleX = 0.85f
-                                scaleY = 0.85f
-                                alpha = 0.6f
-                                rotationY = 18f
-                            },
-                        onClick = { activeIndex = prevIndex }
-                    )
-                }
-
-                // Right Background Card (`next` in `index.php`)
-                if (banners.size > 1) {
-                    val rightBanner = banners[nextIndex]
-                    CoverflowCardItem(
-                        banner = rightBanner,
-                        isActive = false,
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(end = 24.dp)
-                            .width(128.dp)
-                            .height(190.dp)
-                            .graphicsLayer {
-                                scaleX = 0.85f
-                                scaleY = 0.85f
-                                alpha = 0.6f
-                                rotationY = -18f
-                            },
-                        onClick = { activeIndex = nextIndex }
-                    )
-                }
-
-                // Center Active Card (`active` in `index.php` with `#FF0000` border & glow)
-                val activeScale by animateFloatAsState(targetValue = 1f, label = "coverflow_active_scale")
+                contentPadding = PaddingValues(horizontal = 80.dp),
+                pageSpacing = 16.dp,
+                verticalAlignment = Alignment.CenterVertically
+            ) { page ->
+                val banner = banners[page]
+                val isSelected = pagerState.currentPage == page
+                
+                val scale by animateFloatAsState(
+                    targetValue = if (isSelected) 1f else 0.85f,
+                    label = "banner_scale"
+                )
+                
                 CoverflowCardItem(
-                    banner = activeBanner,
-                    isActive = true,
+                    banner = banner,
+                    isActive = isSelected,
                     modifier = Modifier
                         .width(172.dp)
                         .height(246.dp)
                         .graphicsLayer {
-                            scaleX = activeScale
-                            scaleY = activeScale
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = if (isSelected) 1f else 0.6f
                         },
-                    onClick = { onWatchBanner(activeBanner) }
+                    onClick = { onWatchBanner(banner) }
                 )
-
-                // Left Arrow (`❮`)
-                if (banners.size > 1) {
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.6f),
-                        shape = CircleShape,
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .padding(start = 8.dp)
-                            .size(40.dp)
-                            .clickable { activeIndex = prevIndex }
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Previous Banner",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-
-                    // Right Arrow (`❯`)
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.6f),
-                        shape = CircleShape,
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .padding(end = 8.dp)
-                            .size(40.dp)
-                            .clickable { activeIndex = nextIndex }
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = "Next Banner",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
             }
 
             // Active Coverflow Title + Subtitle
