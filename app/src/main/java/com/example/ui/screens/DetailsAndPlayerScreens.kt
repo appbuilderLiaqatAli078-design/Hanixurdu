@@ -10,6 +10,7 @@ import android.graphics.Bitmap
 import android.media.AudioManager
 import android.net.Uri
 import android.view.View
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -166,6 +167,13 @@ private fun Context.findActivity(): Activity? {
         ctx = ctx.baseContext
     }
     return null
+}
+
+class WebAppInterface(private val onToggle: () -> Unit) {
+    @JavascriptInterface
+    fun toggleControls() {
+        onToggle()
+    }
 }
 
 // =========================================================================
@@ -1262,6 +1270,14 @@ fun VideoPlayerScreen(
     var gestureTriggerTick by remember { mutableIntStateOf(0) }
     var activeWebViewRef by remember { mutableStateOf<WebView?>(null) }
 
+    val webInterface = remember {
+        WebAppInterface {
+            activity?.runOnUiThread {
+                showControlsOverlay = !showControlsOverlay
+            }
+        }
+    }
+
     // Enforce Screen Record Allowed + Audio Capture Blocked on entry
     LaunchedEffect(activity) {
         if (activity != null) {
@@ -1454,6 +1470,7 @@ fun VideoPlayerScreen(
                             factory = { ctx ->
                                 WebView(ctx).apply {
                                     activeWebViewRef = this
+                                    addJavascriptInterface(webInterface, "Android")
                                     setLayerType(View.LAYER_TYPE_HARDWARE, null)
                                     settings.javaScriptEnabled = true
                                     settings.domStorageEnabled = true
@@ -1603,6 +1620,11 @@ fun VideoPlayerScreen(
                                                         triggerAutoPlayback();
                                                         if (attempts++ > maxAttempts) clearInterval(itv);
                                                     }, 300);
+
+                                                    // Toggle controls on click/tap
+                                                    document.addEventListener('click', function(e) {
+                                                        if (window.Android) window.Android.toggleControls();
+                                                    });
                                                 })();
                                             """.trimIndent()
                                             view?.evaluateJavascript(isolatePlayerJs, null)
@@ -1641,6 +1663,7 @@ fun VideoPlayerScreen(
                             factory = { ctx ->
                                 WebView(ctx).apply {
                                     activeWebViewRef = this
+                                    addJavascriptInterface(webInterface, "Android")
                                     setLayerType(View.LAYER_TYPE_HARDWARE, null)
                                     settings.javaScriptEnabled = true
                                     settings.domStorageEnabled = true
@@ -1739,6 +1762,11 @@ fun VideoPlayerScreen(
                                                         triggerPlayback();
                                                         if(attempts++ > maxAttempts) clearInterval(itv);
                                                     }, 300);
+
+                                                    // Toggle controls on click/tap
+                                                    document.addEventListener('click', function(e) {
+                                                        if (window.Android) window.Android.toggleControls();
+                                                    });
                                                 })();
                                             """.trimIndent()
                                             view?.evaluateJavascript(autoPlayJs, null)
@@ -1804,60 +1832,77 @@ fun VideoPlayerScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .pointerInput(isScreenLocked) {
-                                detectTapGestures(
-                                    onTap = {
-                                        showControlsOverlay = !showControlsOverlay
-                                        activeWebViewRef?.evaluateJavascript(
-                                            "(function(){ var v = document.querySelector('video'); if(v && v.paused){ v.play().catch(function(){ v.muted = true; v.play(); }); } var b = document.querySelector('.vjs-big-play-button') || document.querySelector('#play-btn'); if(b) b.click(); })();",
-                                            null
+                            .then(
+                                if (current.playbackType in listOf("webpage", "embed")) {
+                                    if (showControlsOverlay && !isScreenLocked) {
+                                        Modifier.clickable(
+                                            indication = null,
+                                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                                        ) {
+                                            showControlsOverlay = false
+                                        }
+                                    } else {
+                                        Modifier
+                                    }
+                                } else {
+                                    Modifier.pointerInput(isScreenLocked) {
+                                        detectTapGestures(
+                                            onTap = {
+                                                showControlsOverlay = !showControlsOverlay
+                                            },
+                                            onDoubleTap = { offset ->
+                                                if (!isScreenLocked) {
+                                                    if (offset.x < size.width / 2f) {
+                                                        triggerSeekDelta(-10_000L)
+                                                    } else {
+                                                        triggerSeekDelta(10_000L)
+                                                    }
+                                                }
+                                            }
                                         )
-                                    },
-                                    onDoubleTap = { offset ->
-                                        if (!isScreenLocked) {
-                                            if (offset.x < size.width / 2f) {
-                                                triggerSeekDelta(-10_000L)
-                                            } else {
-                                                triggerSeekDelta(10_000L)
-                                            }
-                                        }
                                     }
-                                )
-                            }
-                            .pointerInput(isScreenLocked) {
-                                var dragStartX = 0f
-                                detectVerticalDragGestures(
-                                    onDragStart = { startOffset ->
-                                        dragStartX = startOffset.x
-                                    },
-                                    onVerticalDrag = { change, dragAmount ->
-                                        if (isScreenLocked) return@detectVerticalDragGestures
-                                        change.consume()
-                                        val deltaFraction = (-dragAmount / size.height.coerceAtLeast(1)).coerceIn(-0.15f, 0.15f)
-                                        if (dragStartX < size.width / 2f) {
-                                            // Left side: Brightness
-                                            brightnessLevel = (brightnessLevel + deltaFraction).coerceIn(0.05f, 1.0f)
-                                            activity?.window?.let { win ->
-                                                val lp = win.attributes
-                                                lp.screenBrightness = brightnessLevel
-                                                win.attributes = lp
+                                }
+                            )
+                            .then(
+                                if (current.playbackType !in listOf("webpage", "embed") || (showControlsOverlay && !isScreenLocked)) {
+                                    Modifier.pointerInput(isScreenLocked) {
+                                        var dragStartX = 0f
+                                        detectVerticalDragGestures(
+                                            onDragStart = { startOffset ->
+                                                dragStartX = startOffset.x
+                                            },
+                                            onVerticalDrag = { change, dragAmount ->
+                                                if (isScreenLocked) return@detectVerticalDragGestures
+                                                change.consume()
+                                                val deltaFraction = (-dragAmount / size.height.coerceAtLeast(1)).coerceIn(-0.15f, 0.15f)
+                                                if (dragStartX < size.width / 2f) {
+                                                    // Left side: Brightness
+                                                    brightnessLevel = (brightnessLevel + deltaFraction).coerceIn(0.05f, 1.0f)
+                                                    activity?.window?.let { win ->
+                                                        val lp = win.attributes
+                                                        lp.screenBrightness = brightnessLevel
+                                                        win.attributes = lp
+                                                    }
+                                                    activeGestureBadge = "☀️ Brightness ${(brightnessLevel * 100).roundToInt()}%"
+                                                    gestureTriggerTick++
+                                                } else {
+                                                    // Right side: Volume
+                                                    volumeLevel = (volumeLevel + deltaFraction).coerceIn(0.0f, 1.0f)
+                                                    audioManager?.let { am ->
+                                                        val maxV = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                                                        val targetV = (volumeLevel * maxV).roundToInt().coerceIn(0, maxV)
+                                                        am.setStreamVolume(AudioManager.STREAM_MUSIC, targetV, 0)
+                                                    }
+                                                    activeGestureBadge = "🔊 Volume ${(volumeLevel * 100).roundToInt()}%"
+                                                    gestureTriggerTick++
+                                                }
                                             }
-                                            activeGestureBadge = "☀️ Brightness ${(brightnessLevel * 100).roundToInt()}%"
-                                            gestureTriggerTick++
-                                        } else {
-                                            // Right side: Volume
-                                            volumeLevel = (volumeLevel + deltaFraction).coerceIn(0.0f, 1.0f)
-                                            audioManager?.let { am ->
-                                                val maxV = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-                                                val targetV = (volumeLevel * maxV).roundToInt().coerceIn(0, maxV)
-                                                am.setStreamVolume(AudioManager.STREAM_MUSIC, targetV, 0)
-                                            }
-                                            activeGestureBadge = "🔊 Volume ${(volumeLevel * 100).roundToInt()}%"
-                                            gestureTriggerTick++
-                                        }
+                                        )
                                     }
-                                )
-                            }
+                                } else {
+                                    Modifier
+                                }
+                            )
                     )
 
                     // Center Gesture Feedback Pill (Brightness / Volume / Seek / Speed / Aspect Ratio)
